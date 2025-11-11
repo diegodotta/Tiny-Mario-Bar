@@ -18,6 +18,7 @@ const COIN_ENEMY_CHAR = 'ȯ';
 
 let world = '';
 let initialWorld = '';
+let enemies = []; // { idx: number, dir: -1|1 }
 
 const DEFAULT_WORLD = GROUND_CHAR.repeat(200);
 
@@ -51,6 +52,7 @@ let coins = 0;
 const SPEED = 10;
 const GRAVITY = -30;
 const JUMP_VELOCITY = 6;
+const ENEMY_SPEED = 2; // tiles per second
 
 let lastUrlString = '';
 let lastUrlUpdate = 0;
@@ -103,20 +105,29 @@ function render() {
     slice += GROUND_CHAR.repeat(i1 - world.length);
   }
   const chars = slice.split('');
-  const tile = chars[PLAYER_POS] || GROUND_CHAR;
+  // Overlay enemies into chars for display
+  for (const e of enemies) {
+    if (e.idx >= i0 && e.idx < i1) {
+      const under = getTileAt(e.idx);
+      chars[e.idx - i0] = (under === COIN_CHAR) ? COIN_ENEMY_CHAR : ENEMY_CHAR;
+    }
+  }
+  const playerWorldIndex = i0 + PLAYER_POS;
+  const tileUnderPlayer = getTileAt(playerWorldIndex);
+  const enemyHere = enemies.some((e) => e.idx === playerWorldIndex);
   if (y > 0) {
     // While airborne, show pipe variant if above a pipe, else jump variant
-    if (tile === PIPE_CHAR) {
+    if (tileUnderPlayer === PIPE_CHAR) {
       chars[PLAYER_POS] = PIPE_PLAYER_CHAR;
-    } else if (tile === ENEMY_CHAR) {
+    } else if (enemyHere) {
       chars[PLAYER_POS] = JUMP_ENEMY_CHAR;
     } else {
-      chars[PLAYER_POS] = (tile === HOLE_CHAR) ? JUMP_HOLE_CHAR : JUMP_GROUND_CHAR;
+      chars[PLAYER_POS] = (tileUnderPlayer === HOLE_CHAR) ? JUMP_HOLE_CHAR : JUMP_GROUND_CHAR;
     }
   } else {
-    if (tile === PIPE_CHAR) {
+    if (tileUnderPlayer === PIPE_CHAR) {
       chars[PLAYER_POS] = PIPE_PLAYER_CHAR;
-    } else if (tile === COIN_CHAR) {
+    } else if (tileUnderPlayer === COIN_CHAR) {
       chars[PLAYER_POS] = COIN_PLAYER_CHAR;
     } else {
       chars[PLAYER_POS] = PLAYER_CHAR;
@@ -127,8 +138,9 @@ function render() {
     chars[PLAYER_POS] = '💀';
   }
   const status = win ? '' : '';
-  const coinStr = coins > 0 ? `🟡${coins}` : '';
-  const s = chars.join('') + coinStr + status;
+  const coinNum = String(coins % 100).padStart(2, '0');
+  const coinStr = `(🟡${coinNum})`;
+  const s = coinStr + chars.join('') + status;
   const now = performance.now() / 1000;
   if (s !== lastUrlString && (now - lastUrlUpdate) >= URL_UPDATE_INTERVAL) {
     lastUrlString = s;
@@ -178,6 +190,29 @@ function update(dt) {
   y += vy * dt;
   if (y < 0) y = 0;
 
+  // Move enemies: time-based patrol between obstacles (pipes and holes)
+  // Use per-enemy accumulator to advance whole tiles at a stable rate
+  for (const e of enemies) {
+    if (e.acc == null) e.acc = 0;
+    e.acc += ENEMY_SPEED * dt;
+    let guard = 0;
+    while (e.acc >= 1 && guard++ < 4) { // move up to 4 tiles per frame max
+      let desired = e.idx + e.dir;
+      let t = getTileAt(desired);
+      // If next is blocked, reverse once
+      if (desired < 0 || desired >= world.length || t === PIPE_CHAR || t === HOLE_CHAR) {
+        e.dir = -e.dir;
+        desired = e.idx + e.dir;
+        t = getTileAt(desired);
+      }
+      // Move if not blocked after potential reverse
+      if (!(desired < 0 || desired >= world.length || t === PIPE_CHAR || t === HOLE_CHAR)) {
+        e.idx = desired;
+      }
+      e.acc -= 1;
+    }
+  }
+
   const playerIndex = Math.floor(offset) + PLAYER_POS;
   const currentTile = getTileAt(playerIndex);
   // Win if touching flag
@@ -186,13 +221,15 @@ function update(dt) {
     dir = 0; vy = 0;
     return;
   }
-  // Enemy interactions
+  // Enemy interactions using dynamic enemy positions
+  const enemyIndex = enemies.findIndex((e) => e.idx === playerIndex);
   // Stomp only when actually landing on the tile (prevY>0 and now on ground)
-  if (prevY > 0 && y === 0 && currentTile === ENEMY_CHAR) {
+  if (prevY > 0 && y === 0 && enemyIndex !== -1) {
     coins += 1;
-    setTileAt(playerIndex, GROUND_CHAR);
+    // Do not alter underlying tile (could be a coin)
+    enemies.splice(enemyIndex, 1);
     vy = JUMP_VELOCITY * 0.6; // bounce
-  } else if (y === 0 && currentTile === ENEMY_CHAR) {
+  } else if (y === 0 && enemyIndex !== -1) {
     // Walking into an enemy on the ground kills the player
     gameOver = true;
     dir = 0; vy = 0;
@@ -227,6 +264,14 @@ function init() {
   const loaded = loadWorldFromGlobal() || loadWorldInline();
   world = loaded && loaded.length ? loaded : DEFAULT_WORLD;
   initialWorld = world;
+  // Extract enemies from world into dynamic list and clear them from world tiles
+  enemies = [];
+  for (let i = 0; i < world.length; i++) {
+    if (world[i] === ENEMY_CHAR) {
+      enemies.push({ idx: i, dir: -1, acc: 0 });
+      setTileAt(i, GROUND_CHAR);
+    }
+  }
   requestAnimationFrame(tick);
 }
 
@@ -241,6 +286,14 @@ function resetGame() {
   win = false;
   coins = 0;
   if (initialWorld) world = initialWorld;
+  // Rebuild enemies from the reset world and clear them from tiles
+  enemies = [];
+  for (let i = 0; i < world.length; i++) {
+    if (world[i] === ENEMY_CHAR) {
+      enemies.push({ idx: i, dir: -1, acc: 0 });
+      setTileAt(i, GROUND_CHAR);
+    }
+  }
   // force immediate URL refresh on next render
   lastUrlString = '';
   lastUrlUpdate = 0;
