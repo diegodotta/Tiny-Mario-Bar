@@ -48,11 +48,14 @@ let vy = 0;
 let gameOver = false;
 let win = false;
 let coins = 0;
+let started = false; // game starts after first input
 
 const SPEED = 10;
 const GRAVITY = -30;
 const JUMP_VELOCITY = 6;
 const ENEMY_SPEED = 2; // tiles per second
+const MARQUEE_SPEED = 10; // chars per second for rolling text
+let marqueeOffset = 0; // rolling text character offset
 
 let lastUrlString = '';
 let lastUrlUpdate = 0;
@@ -69,6 +72,10 @@ function onKeyDown(e) {
       vy = JUMP_VELOCITY;
       jumpStartIndex = Math.floor(offset) + PLAYER_POS;
     }
+  }
+  // First input starts the game loop updates
+  if (!started && (e.key === ' ' || e.key.startsWith('Arrow') || e.key.toLowerCase() === 'a' || e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'w')) {
+    started = true;
   }
   if (e.key === 'r' || e.key === 'R') {
     resetGame();
@@ -140,6 +147,34 @@ function render() {
   const status = win ? '' : '';
   const coinNum = String(coins % 100).padStart(2, '0');
   const coinStr = `(🟡${coinNum})`;
+  // Rolling marquee messages for start and game over
+  let showMarquee = false;
+  let marquee = '';
+  if (!started && !gameOver && !win) {
+    showMarquee = true;
+    const msg = 'PRESS⠤SPACE⠤TO⠤START';
+    const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
+    const idx = Math.floor(marqueeOffset) % base.length;
+    marquee = (base.slice(idx) + base.slice(0, idx));
+  } else if (gameOver) {
+    showMarquee = true;
+    const msg = 'GAME⠤OVER⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
+    const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
+    const idx = Math.floor(marqueeOffset) % base.length;
+    marquee = (base.slice(idx) + base.slice(0, idx));
+  }
+  // If marquee active, overlay it into the scene to the right of the player
+  if (showMarquee) {
+    const start = Math.min(PLAYER_POS + 1, SCENE_LENGTH);
+    const spaceRight = Math.max(0, SCENE_LENGTH - start);
+    const overlay = marquee.slice(0, spaceRight);
+    for (let i = 0; i < overlay.length; i++) {
+      const pos = start + i;
+      if (pos >= 0 && pos < SCENE_LENGTH) {
+        chars[pos] = overlay[i];
+      }
+    }
+  }
   const s = coinStr + chars.join('') + status;
   const now = performance.now() / 1000;
   if (s !== lastUrlString && (now - lastUrlUpdate) >= URL_UPDATE_INTERVAL) {
@@ -158,7 +193,11 @@ let lastTime = performance.now();
 function tick(t) {
   const dt = Math.min(0.05, (t - lastTime) / 1000);
   lastTime = t;
-  if (!gameOver && !win) update(dt);
+  // Advance marquee continuously
+  marqueeOffset += MARQUEE_SPEED * dt;
+  if (marqueeOffset > 1e9) marqueeOffset = marqueeOffset % 1000; // prevent unbounded growth
+  // Only update physics after the game has started and while active
+  if (started && !gameOver && !win) update(dt);
   render();
   requestAnimationFrame(tick);
 }
@@ -285,6 +324,8 @@ function resetGame() {
   gameOver = false;
   win = false;
   coins = 0;
+  started = true; // immediately start after restart
+  marqueeOffset = 0;
   if (initialWorld) world = initialWorld;
   // Rebuild enemies from the reset world and clear them from tiles
   enemies = [];
