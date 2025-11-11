@@ -47,19 +47,23 @@ let coins = 0;
 
 const SPEED = 10;
 const GRAVITY = -30;
-const JUMP_VELOCITY = 14;
+const JUMP_VELOCITY = 6;
 
 let lastUrlString = '';
 let lastUrlUpdate = 0;
 const URL_UPDATE_INTERVAL = 1 / 12; // seconds
 
 const keys = new Set();
+let jumpStartIndex = -1; // track where the player initiated the jump
 function onKeyDown(e) {
   keys.add(e.key);
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dir = -1;
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 1;
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-    if (y === 0) vy = JUMP_VELOCITY;
+    if (y === 0) {
+      vy = JUMP_VELOCITY;
+      jumpStartIndex = Math.floor(offset) + PLAYER_POS;
+    }
   }
   if (e.key === 'r' || e.key === 'R') {
     resetGame();
@@ -139,7 +143,7 @@ function tick(t) {
 }
 
 function update(dt) {
-  // Horizontal movement with pipe collision on ground
+  // Horizontal movement with pipe collision on ground and coin rules in air
   const prevOffset = offset;
   let intended = offset + dir * SPEED * dt;
   if (intended < 0) intended = 0;
@@ -147,9 +151,16 @@ function update(dt) {
   const nextTile = getTileAt(nextIndex);
   const currIndex = Math.floor(offset) + PLAYER_POS;
   const currTile = getTileAt(currIndex);
-  // Only block when attempting to step into a pipe from a non-pipe tile while grounded
-  if (y === 0 && nextTile === PIPE_CHAR && currTile !== PIPE_CHAR) {
-    intended = prevOffset; // blocked by pipe front
+  // Ground: only pipes block movement
+  if (y === 0) {
+    if (nextTile === PIPE_CHAR && currTile !== PIPE_CHAR) {
+      intended = prevOffset; // blocked by pipe front
+    }
+  } else {
+    // Airborne: block lateral entry into coins unless it's the coin directly above jump start
+    if (nextTile === COIN_CHAR && nextIndex !== jumpStartIndex) {
+      intended = prevOffset; // blocked by coin side in air
+    }
   }
   offset = intended;
 
@@ -165,14 +176,16 @@ function update(dt) {
     dir = 0; vy = 0;
     return;
   }
-  // Collect coin only when jumping (player is in the air)
-  if (y > 0 && currentTile === COIN_CHAR) {
+  // Collect coin only when ascending from directly below the coin you jumped under
+  if (y > 0 && vy > 0 && currentTile === COIN_CHAR && playerIndex === jumpStartIndex) {
     coins += 1;
     setTileAt(playerIndex, GROUND_CHAR);
     // Dampen upward velocity to shorten jump duration
     if (vy > 0) {
       vy *= 0.4;
     }
+    // After collecting, prevent further coin checks tied to this jump index
+    jumpStartIndex = -1;
   }
   // Immediate game over if landed in a hole
   if (y === 0 && currentTile === HOLE_CHAR) {
@@ -183,6 +196,8 @@ function update(dt) {
   // When on ground (non-hole), clamp vertical velocity
   if (y === 0 && currentTile !== HOLE_CHAR) {
     vy = 0;
+    // Reset jump start upon landing
+    jumpStartIndex = -1;
   }
 }
 
