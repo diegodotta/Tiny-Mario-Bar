@@ -117,8 +117,12 @@ function render() {
       chars[PLAYER_POS] = PLAYER_CHAR;
     }
   }
-  const status = win ? '🏁' : (gameOver ? '💀' : '');
-  const coinStr = coins > 0 ? `🪙${coins}` : '';
+  // On game over, show skull at the player's position
+  if (gameOver) {
+    chars[PLAYER_POS] = '💀';
+  }
+  const status = win ? '' : '';
+  const coinStr = coins > 0 ? `🟡${coins}` : '';
   const s = chars.join('') + coinStr + status;
   const now = performance.now() / 1000;
   if (s !== lastUrlString && (now - lastUrlUpdate) >= URL_UPDATE_INTERVAL) {
