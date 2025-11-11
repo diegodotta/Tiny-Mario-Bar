@@ -12,6 +12,9 @@ const PIPE_CHAR = '⠶';
 const PIPE_PLAYER_CHAR = '⠷';
 const COIN_CHAR = '⠥';
 const COIN_PLAYER_CHAR = '⠧';
+const ENEMY_CHAR = 'o';
+const JUMP_ENEMY_CHAR = 'ȯ';
+const COIN_ENEMY_CHAR = 'ȯ';
 
 let world = '';
 let initialWorld = '';
@@ -105,6 +108,8 @@ function render() {
     // While airborne, show pipe variant if above a pipe, else jump variant
     if (tile === PIPE_CHAR) {
       chars[PLAYER_POS] = PIPE_PLAYER_CHAR;
+    } else if (tile === ENEMY_CHAR) {
+      chars[PLAYER_POS] = JUMP_ENEMY_CHAR;
     } else {
       chars[PLAYER_POS] = (tile === HOLE_CHAR) ? JUMP_HOLE_CHAR : JUMP_GROUND_CHAR;
     }
@@ -149,6 +154,7 @@ function tick(t) {
 function update(dt) {
   // Horizontal movement with pipe collision on ground and coin rules in air
   const prevOffset = offset;
+  const prevY = y; // track previous vertical position to detect landings
   let intended = offset + dir * SPEED * dt;
   if (intended < 0) intended = 0;
   const nextIndex = Math.floor(intended) + PLAYER_POS;
@@ -177,6 +183,18 @@ function update(dt) {
   // Win if touching flag
   if (currentTile === FLAG_CHAR) {
     win = true;
+    dir = 0; vy = 0;
+    return;
+  }
+  // Enemy interactions
+  // Stomp only when actually landing on the tile (prevY>0 and now on ground)
+  if (prevY > 0 && y === 0 && currentTile === ENEMY_CHAR) {
+    coins += 1;
+    setTileAt(playerIndex, GROUND_CHAR);
+    vy = JUMP_VELOCITY * 0.6; // bounce
+  } else if (y === 0 && currentTile === ENEMY_CHAR) {
+    // Walking into an enemy on the ground kills the player
+    gameOver = true;
     dir = 0; vy = 0;
     return;
   }
