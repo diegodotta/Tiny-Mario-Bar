@@ -57,6 +57,24 @@ const ENEMY_SPEED = 2; // tiles per second
 const MARQUEE_SPEED = 10; // chars per second for rolling text
 let marqueeOffset = 0; // rolling text character offset
 
+// Audio
+let music = new Audio('sound/soundtrack.mp3');
+music.loop = true;
+music.volume = 0.3;
+let sfxJump = new Audio('sound/jump.mp3');
+sfxJump.volume = 0.5;
+let sfxCoin = new Audio('sound/coin.mp3');
+sfxCoin.volume = 0.5;
+let sfxDie = new Audio('sound/death.mp3');
+sfxDie.volume = 0.5;
+let sfxClear = new Audio('sound/stage_clear.mp3');
+sfxClear.volume = 0.5;
+let sfxStomp = null; // optional separate stomp sound
+try {
+  sfxStomp = new Audio('sound/stomp.mp3');
+  sfxStomp.volume = 0.5;
+} catch {}
+
 let lastUrlString = '';
 let lastUrlUpdate = 0;
 const URL_UPDATE_INTERVAL = 1 / 12; // seconds
@@ -69,6 +87,7 @@ function onKeyDown(e) {
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 1;
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
     if (y === 0) {
+      try { sfxJump.currentTime = 0; sfxJump.play(); } catch {}
       vy = JUMP_VELOCITY;
       jumpStartIndex = Math.floor(offset) + PLAYER_POS;
     }
@@ -76,6 +95,7 @@ function onKeyDown(e) {
   // First input starts the game loop updates
   if (!started && (e.key === ' ' || e.key.startsWith('Arrow') || e.key.toLowerCase() === 'a' || e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'w')) {
     started = true;
+    try { music.currentTime = 0; music.play(); } catch {}
   }
   if (e.key === 'r' || e.key === 'R') {
     resetGame();
@@ -159,6 +179,12 @@ function render() {
   } else if (gameOver) {
     showMarquee = true;
     const msg = 'GAME⠤OVER⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
+    const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
+    const idx = Math.floor(marqueeOffset) % base.length;
+    marquee = (base.slice(idx) + base.slice(0, idx));
+  } else if (win) {
+    showMarquee = true;
+    const msg = 'CONGRATULATIONS⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
     const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
     const idx = Math.floor(marqueeOffset) % base.length;
     marquee = (base.slice(idx) + base.slice(0, idx));
@@ -258,6 +284,8 @@ function update(dt) {
   if (currentTile === FLAG_CHAR) {
     win = true;
     dir = 0; vy = 0;
+    try { music.pause(); } catch {}
+    try { sfxClear.currentTime = 0; sfxClear.play(); } catch {}
     return;
   }
   // Enemy interactions using dynamic enemy positions
@@ -268,16 +296,23 @@ function update(dt) {
     // Do not alter underlying tile (could be a coin)
     enemies.splice(enemyIndex, 1);
     vy = JUMP_VELOCITY * 0.6; // bounce
+    try {
+      const s = sfxStomp || sfxCoin;
+      s.currentTime = 0; s.play();
+    } catch {}
   } else if (y === 0 && enemyIndex !== -1) {
     // Walking into an enemy on the ground kills the player
     gameOver = true;
     dir = 0; vy = 0;
+    try { music.pause(); } catch {}
+    try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
     return;
   }
   // Collect coin only when ascending from directly below the coin you jumped under
   if (y > 0 && vy > 0 && currentTile === COIN_CHAR && playerIndex === jumpStartIndex) {
     coins += 1;
     setTileAt(playerIndex, GROUND_CHAR);
+    try { sfxCoin.currentTime = 0; sfxCoin.play(); } catch {}
     // Dampen upward velocity to shorten jump duration
     if (vy > 0) {
       vy *= 0.4;
@@ -289,6 +324,8 @@ function update(dt) {
   if (y === 0 && currentTile === HOLE_CHAR) {
     gameOver = true;
     dir = 0; vy = 0;
+    try { music.pause(); } catch {}
+    try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
     return;
   }
   // When on ground (non-hole), clamp vertical velocity
@@ -338,4 +375,7 @@ function resetGame() {
   // force immediate URL refresh on next render
   lastUrlString = '';
   lastUrlUpdate = 0;
+  try { sfxDie.pause(); sfxDie.currentTime = 0; } catch {}
+  try { sfxClear.pause(); sfxClear.currentTime = 0; } catch {}
+  try { music.currentTime = 0; music.play(); } catch {}
 }
