@@ -1,6 +1,6 @@
 # Tiny Mario
 
-A tiny, text-first platformer inspired by (URL Snake)[https://demian.ferrei.ro/snake] and Tiny Horse. The level is rendered as text (primarily Unicode Braille) to achieve a dense, crisp layout in a purely textual surface.
+A tiny side‑scroller, text-first platformer inspired by [URL Snake](https://demian.ferrei.ro/snake) and [Tiny Horse](https://github.com/your-repo/tiny-horse). The level is rendered as text (primarily Unicode Braille) to achieve a dense, crisp layout in a purely textual surface.
 
 - Inspiration: URL Snake and Tiny Horse
 - Reference Level: Super Mario Bros World 1-1
@@ -65,6 +65,7 @@ OR
 
 ## Roadmap
 - Additional levels
+- Migrate to the 8-dot Braille pattern instead of 6.
 
 ## Contributing
 - Please open an issue or PR for changes
@@ -78,5 +79,5 @@ You can copy, modify, distribute and perform the work, even for commercial purpo
 - Url Snake by Demian Ferreiro: https://demian.ferrei.ro/snake
 - Tiny Horse by Diego Dotta: https://github.com/diegodotta/horse-jump-url-bar
 - Super Mario Bros World 1-1: https://ahistoryofthemushroomkingdom.fandom.com/wiki/World_1-1
-- Unicode Braille patterns: https://www.unicode.org/charts/PDF/U2800.pdf
+- Unicode Braille patterns: https://en.wikipedia.org/wiki/Braille_Patterns
 - Sound Effects: https://www.beepbox.co/
