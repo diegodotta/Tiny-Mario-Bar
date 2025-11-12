@@ -3,10 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Super Mario Bar</title>
+    <title>Tiny Mario Bar</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <script src="./levels/world-1-1.js"></script>
+    <div id="hud">
+      <span id="instructions">Press UP to start · R to restart</span>
+      <span id="score">Score: 00</span>
+      <span id="high">High score: 00</span>
+      <button id="share" type="button" style="padding: 2px 6px; font-size: 12px; cursor: pointer;">Share</button>
+    </div>
+    <script src="./src/levels.js"></script>
     <script src="./src/game.js"></script>
   </body>
 </html>

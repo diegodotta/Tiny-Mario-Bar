@@ -83,6 +83,6 @@ MIT (to be confirmed)
 
 ## References
 - Tiny Horse (horse-jump-url-bar): https://github.com/diegodotta/horse-jump-url-bar
-- Tiny Horse game.js: https://github.com/diegodotta/horse-jump-url-bar/blob/master/game.js
 - World 1-1 reference: https://ahistoryofthemushroomkingdom.fandom.com/wiki/World_1-1
 - Unicode Braille patterns: https://www.unicode.org/charts/PDF/U2800.pdf
+- Sound Effects: https://www.beepbox.co/
