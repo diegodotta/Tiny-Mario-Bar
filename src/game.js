@@ -32,12 +32,8 @@ let undergroundWorld = '';
 let undergroundRaw = '';
 let isUnderground = false;
 let prevOverworldOffset = 0;
-let lastPipeUndergroundIndex = -1;
-let firstPipeOverworldIndex = -1;
 let undergroundPipeIndices = [];
 let undergroundVisited = false;
-let overworldPipeIndices = [];
-let exitPipeUndergroundIndex = -1;
 let pipeAnim = null; // {phase:'over'|'under', frames:string[], idx:number, t:number, underStartOffset:number}
 let playerPos = PLAYER_POS; // dynamic screen position (0..PLAYER_POS), default anchored at 3
 
@@ -741,8 +737,6 @@ function init() {
   const loaded = loadWorldFromGlobal() || loadWorldInline();
   world = loaded && loaded.length ? loaded : DEFAULT_WORLD;
   initialWorld = world;
-  // Determine the first pipe index in the overworld (for entry)
-  firstPipeOverworldIndex = initialWorld.indexOf(PIPE_CHAR);
   // Prepare underground world if present
   try {
     if (typeof window !== 'undefined' && window.LEVEL_WORLD_1_1_UNDERGROUND) {
@@ -765,7 +759,6 @@ function init() {
       for (let i = 0; i < undergroundWorld.length; i++) {
         if (undergroundWorld[i] === PIPE_CHAR) undergroundPipeIndices.push(i);
       }
-      lastPipeUndergroundIndex = undergroundPipeIndices.length ? undergroundPipeIndices[undergroundPipeIndices.length - 1] : -1;
     }
   } catch {}
   // Extract enemies from world into dynamic list and clear them from world tiles
