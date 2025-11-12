@@ -1,27 +1,30 @@
+:root {
+  --border-color: rgba(150,150,150,0.4);
+  --background-color: rgba(150,150,150,0.1);
+}
+
 .tiny-mario { 
   max-width: 800px; 
   margin: 12px auto; 
-  background: #fff; 
-  color: #222; 
-  border: 1px solid #e5e5e5; 
+  border: 1px solid var(--border-color); 
+  background: var(--background-color); 
   border-radius: 8px; 
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 14px;
 }
 .tiny-mario .hud-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
-.tiny-mario .hud-instructions { border-bottom: 1px solid #eee; }
+.tiny-mario .hud-instructions { border-bottom: 1px solid var(--border-color); }
 .tiny-mario .hud-url { align-items: stretch; }
 .tiny-mario #url-display {
   display: block;
   flex: 1 1 auto;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
   white-space: pre;
   overflow-x: hidden;
   
 }
-.tiny-mario .url-zoom { display: inline-flex; gap: 6px; border-bottom: 1px solid #eee; }
+.tiny-mario .url-zoom { display: inline-flex; gap: 6px; border-bottom: 1px solid var(--border-color); }
 .tiny-mario #instructions { flex: 1}
 .tiny-mario #instructions::before { content: 'ℹ️'; margin-right: 4px; }
 .tiny-mario .hud-emoji { width: 18px; display: inline-flex; justify-content: center; }
@@ -29,25 +32,24 @@
 .tiny-mario #score { flex: 1 1 0; min-width: 0; text-align: left; margin-right: 0; }
 .tiny-mario #score:before { content: '📊'; margin-right: 4px; }
 .tiny-mario #high { flex: 1 1 0; min-width: 0; text-align: right; margin-right: 0; }
-.tiny-mario .hud-button { padding: 2px 8px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; white-space: nowrap; flex: 0 0 auto; }
+.tiny-mario .hud-button { padding: 2px 8px; cursor: pointer; border: 1px solid var(--border-color); border-radius: 6px; background: #fafafa; white-space: nowrap; flex: 0 0 auto; }
 .tiny-mario .hud-button:hover { background: #f0f0f0; }
 .tiny-mario #share { margin-right: 20px; }
-
-.tiny-mario .controls.touch-only {
+.tiny-mario .hud-credits { color: #666; border-top: 1px solid var(--border-color); }
+.tiny-mario .controls {
   display: grid;
   grid-template-areas:
     ". up ."
     "left down right";
-  width: 75vmin;
-  height: 50vmin;
+  width: 70vmin;
+  height: 45vmin;
   margin: 10px auto;
-  padding-top: 30vh;
 }
 .tiny-mario .controls button {
   color: #888;
   font-size: 8vmin;
   background: none;
-  border: 2px solid;
+  border: 2px solid var(--border-color);
   margin: 2px;
   padding: 0;  border-radius: 5vmin;
 }
