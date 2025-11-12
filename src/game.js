@@ -1,3 +1,11 @@
+/*
+ Tiny Mario Bar
+ Author: Diego Dotta — https://diego.horse
+ Play: https://diego.horse/tiny-mario
+ Controls: Desktop — SPACE to start/jump, R to restart (auto-starts). Mobile — Tap to start/jump/restart.
+ License: MIT
+*/
+
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
@@ -126,25 +134,25 @@ const TIME_DRAIN_RATE = 20; // coins per second gained from remaining time after
 const PIPE_ANIM_FRAME_DUR = 0.12; // seconds per frame for pipe entry animation
 
 // Audio
-let music = new Audio('sound/soundtrack.mp3');
+let music = new Audio(domain + '/sound/soundtrack.mp3');
 music.loop = true;
 music.volume = 0.3;
-let musicUnderground = new Audio('sound/underground.mp3');
+let musicUnderground = new Audio(domain + '/sound/underground.mp3');
 musicUnderground.loop = true;
 musicUnderground.volume = 0.3;
-let sfxJump = new Audio('sound/jump.mp3');
+let sfxJump = new Audio(domain + '/sound/jump.mp3');
 sfxJump.volume = 0.3;
-let sfxCoin = new Audio('sound/coin.mp3');
+let sfxCoin = new Audio(domain + '/sound/coin.mp3');
 sfxCoin.volume = 0.7;
-let sfxPipe = new Audio('sound/pipe.wav');
+let sfxPipe = new Audio(domain + '/sound/pipe.wav');
 sfxPipe.volume = 0.7;
-let sfxDie = new Audio('sound/death.mp3');
+let sfxDie = new Audio(domain + '/sound/death.mp3');
 sfxDie.volume = 0.5;
-let sfxClear = new Audio('sound/stage_clear.mp3');
+let sfxClear = new Audio(domain + '/sound/stage_clear.mp3');
 sfxClear.volume = 0.5;
 let sfxStomp = null; // optional separate stomp sound
 try {
-  sfxStomp = new Audio('sound/stomp.mp3');
+  sfxStomp = new Audio(domain + '/sound/stomp.mp3');
   sfxStomp.volume = 0.5;
 } catch {}
 
@@ -231,7 +239,6 @@ function setupUrlControls() {
 }
 function onKeyDown(e) {
   keys.add(e.key);
-  try { console.debug('[key]', e.key); } catch {}
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dir = -1;
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 1;
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
@@ -249,12 +256,8 @@ function onKeyDown(e) {
     const pipes = [];
     for (let i = 0; i < world.length; i++) if (world[i] === PIPE_CHAR) pipes.push(i);
     const entryPipeIdx = pipes.length >= 4 ? pipes[3] : -1;
-    try {
-      console.debug('[down]', { y, tile, playerIndex, entryPipeOverworldIndex: entryPipeIdx, hasUnderground: !!undergroundWorld });
-    } catch {}
     // Entry is allowed only on the 4th overworld pipe
     if (y === 0 && tile === PIPE_CHAR && undergroundWorld && entryPipeIdx !== -1 && playerIndex === entryPipeIdx) {
-      try { console.debug('[underground] entering anim'); } catch {}
       prevOverworldOffset = offset;
       // compute target offset for underground start now
       let underStartOffset = 0;
@@ -460,12 +463,10 @@ function tick(t) {
     if (pipeAnim.t >= PIPE_ANIM_FRAME_DUR) {
       pipeAnim.t = 0;
       pipeAnim.idx++;
-      try { console.debug('[pipeAnim]', pipeAnim.phase, 'idx', pipeAnim.idx); } catch {}
       if (pipeAnim.mode === 'enter') {
         const overLen = (pipeAnim.framesOver || pipeAnim.frames || ['⠶','⠴','⠲']).length;
         if (pipeAnim.phase === 'over' && pipeAnim.idx >= overLen) {
           // Switch to underground and start the underground-side animation
-          try { console.debug('[pipeAnim] switching to underground'); } catch {}
           world = undergroundWorld;
           isUnderground = true;
           offset = pipeAnim.underStartOffset;
@@ -489,7 +490,6 @@ function tick(t) {
       } else if (pipeAnim.mode === 'exit') {
         if (pipeAnim.phase === 'under' && pipeAnim.idx >= 3) {
           // Switch to overworld now and start over-phase exit frames
-          try { console.debug('[pipeAnim] switching to overworld'); } catch {}
           world = initialWorld;
           isUnderground = false;
           // Place at the pipe immediately after the 4th overworld pipe (i.e., the 5th overall)
@@ -643,7 +643,6 @@ function update(dt) {
       }
     }
     if (lastInvIdx !== -1 && playerIndex === lastInvIdx) {
-      try { console.debug('[underground] exiting at last inverted pipe (anim)'); } catch {}
       try { sfxPipe.currentTime = 0; sfxPipe.play(); } catch {}
       pipeAnim = { mode: 'exit', phase: 'under', idx: 0, t: 0 };
     }
@@ -744,7 +743,6 @@ function init() {
   initialWorld = world;
   // Determine the first pipe index in the overworld (for entry)
   firstPipeOverworldIndex = initialWorld.indexOf(PIPE_CHAR);
-  try { console.debug('[init] firstPipeOverworldIndex', firstPipeOverworldIndex); } catch {}
   // Prepare underground world if present
   try {
     if (typeof window !== 'undefined' && window.LEVEL_WORLD_1_1_UNDERGROUND) {
@@ -768,7 +766,6 @@ function init() {
         if (undergroundWorld[i] === PIPE_CHAR) undergroundPipeIndices.push(i);
       }
       lastPipeUndergroundIndex = undergroundPipeIndices.length ? undergroundPipeIndices[undergroundPipeIndices.length - 1] : -1;
-      try { console.debug('[init] underground pipes', { count: undergroundPipeIndices.length, lastPipeUndergroundIndex }); } catch {}
     }
   } catch {}
   // Extract enemies from world into dynamic list and clear them from world tiles
