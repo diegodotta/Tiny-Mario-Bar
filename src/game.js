@@ -30,6 +30,7 @@ let undergroundVisited = false;
 let overworldPipeIndices = [];
 let exitPipeUndergroundIndex = -1;
 let pipeAnim = null; // {phase:'over'|'under', frames:string[], idx:number, t:number, underStartOffset:number}
+let playerPos = PLAYER_POS; // dynamic screen position (0..PLAYER_POS), default anchored at 3
 
 const DEFAULT_WORLD = GROUND_CHAR.repeat(200);
 
@@ -143,7 +144,7 @@ function setupShare() {
   const btn = document.getElementById('share');
   if (!btn) return;
   btn.onclick = async () => {
-    const text = `🍄👲🏻🏰 I scored ${coins} coins in Tiny Mario Bar! https://diego.horse/tiny-mario`;
+    const text = `🍄👲🏻🏰 My high score is ${bestCoins} coins in Tiny Mario Bar! https://diego.horse/tiny-mario`;
     try {
       if (navigator.share) {
         await navigator.clipboard.writeText(`${text}`);
@@ -158,6 +159,25 @@ function setupShare() {
     } catch {}
   };
 }
+
+function setupUrlControls() {
+  const display = document.getElementById('url-display');
+  const minus = document.getElementById('url-font-minus');
+  const plus = document.getElementById('url-font-plus');
+  if (!display || !minus || !plus) return;
+  let size = 14;
+  try {
+    const stored = parseInt(localStorage.getItem('urlFontSize') || '12', 10);
+    if (!Number.isNaN(stored)) size = stored;
+  } catch {}
+  function apply() {
+    display.style.fontSize = `${size}px`;
+    try { localStorage.setItem('urlFontSize', String(size)); } catch {}
+  }
+  apply();
+  plus.onclick = () => { size = Math.min(size + 1, 28); apply(); };
+  minus.onclick = () => { size = Math.max(size - 1, 14); apply(); };
+}
 function onKeyDown(e) {
   keys.add(e.key);
   try { console.debug('[key]', e.key); } catch {}
@@ -167,12 +187,12 @@ function onKeyDown(e) {
     if (y === 0) {
       try { sfxJump.currentTime = 0; sfxJump.play(); } catch {}
       vy = JUMP_VELOCITY;
-      jumpStartIndex = Math.floor(offset) + PLAYER_POS;
+      jumpStartIndex = Math.floor(offset) + Math.floor(playerPos);
     }
   }
   // Enter underground with DOWN/S while on the first overworld pipe
   if ((e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') && !isUnderground && !(pipeAnim && pipeAnim.phase)) {
-    const playerIndex = Math.floor(offset) + PLAYER_POS;
+    const playerIndex = Math.floor(offset) + Math.floor(playerPos);
     const tile = getTileAt(playerIndex);
     // Compute 4th overworld pipe index dynamically
     const pipes = [];
@@ -222,6 +242,23 @@ function onKeyUp(e) {
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 
+const urlRow = typeof document !== 'undefined' ? document.querySelector('.hud-url') : null;
+const toggle = typeof document !== 'undefined' ? document.getElementById('toggle-url') : null;
+if (urlRow) {
+  // Ensure visible by default using stylesheet (flex); empty inline style lets CSS apply
+  urlRow.style.display = '';
+}
+if (toggle && urlRow) {
+  // Set initial label based on current visibility
+  const currentlyVisible = urlRow.style.display !== 'none';
+  toggle.textContent = currentlyVisible ? 'Hide URL Bar' : 'Show URL Bar';
+  toggle.addEventListener('click', () => {
+    const visible = urlRow.style.display !== 'none';
+    urlRow.style.display = visible ? 'none' : '';
+    toggle.textContent = visible ? 'Show URL Bar' : 'Hide URL Bar';
+  });
+}
+
 function getTileAt(idx) {
   if (idx < 0) return GROUND_CHAR;
   if (idx >= world.length) return GROUND_CHAR;
@@ -252,25 +289,25 @@ function render() {
       chars[e.idx - i0] = (under === COIN_CHAR) ? COIN_ENEMY_CHAR : ENEMY_CHAR;
     }
   }
-  const playerWorldIndex = i0 + PLAYER_POS;
+  const playerWorldIndex = i0 + Math.floor(playerPos);
   const tileUnderPlayer = getTileAt(playerWorldIndex);
   const enemyHere = enemies.some((e) => e.idx === playerWorldIndex);
   if (y > 0) {
     // While airborne, show pipe variant if above a pipe, else jump variant
     if (tileUnderPlayer === PIPE_CHAR) {
-      chars[PLAYER_POS] = isUnderground ? '⠯' : PIPE_PLAYER_CHAR;
+      chars[Math.floor(playerPos)] = isUnderground ? '⠯' : PIPE_PLAYER_CHAR;
     } else if (enemyHere) {
-      chars[PLAYER_POS] = JUMP_ENEMY_CHAR;
+      chars[Math.floor(playerPos)] = JUMP_ENEMY_CHAR;
     } else {
-      chars[PLAYER_POS] = (tileUnderPlayer === HOLE_CHAR) ? JUMP_HOLE_CHAR : JUMP_GROUND_CHAR;
+      chars[Math.floor(playerPos)] = (tileUnderPlayer === HOLE_CHAR) ? JUMP_HOLE_CHAR : JUMP_GROUND_CHAR;
     }
   } else {
     if (tileUnderPlayer === PIPE_CHAR) {
-      chars[PLAYER_POS] = isUnderground ? '⠯' : PIPE_PLAYER_CHAR;
+      chars[Math.floor(playerPos)] = isUnderground ? '⠯' : PIPE_PLAYER_CHAR;
     } else if (tileUnderPlayer === COIN_CHAR) {
-      chars[PLAYER_POS] = COIN_PLAYER_CHAR;
+      chars[Math.floor(playerPos)] = COIN_PLAYER_CHAR;
     } else {
-      chars[PLAYER_POS] = PLAYER_CHAR;
+      chars[Math.floor(playerPos)] = PLAYER_CHAR;
     }
   }
   // Override player glyph while pipe animation is active
@@ -293,17 +330,17 @@ function render() {
         frameGlyph = framesOverExit[Math.min(pipeAnim.idx, framesOverExit.length - 1)];
       }
     }
-    chars[PLAYER_POS] = frameGlyph;
+    chars[Math.floor(playerPos)] = frameGlyph;
   }
   // On game over, show skull at the player's position
   if (gameOver) {
-    chars[PLAYER_POS] = '💀';
+    chars[Math.floor(playerPos)] = '💀';
   }
   const status = win ? '' : '';
   const coinNum = String(coins % 100).padStart(2, '0');
-  const coinStr = `(🟡${coinNum})`;
+  const coinStr = `🟡${coinNum}⠿`;
   const timeNum = String(Math.floor(timeLeft) % 100).padStart(2, '0');
-  const timeStr = `(⏱${timeNum})`;
+  const timeStr = `⏱${timeNum}`;
   // Rolling marquee messages for start and game over
   let showMarquee = false;
   let marquee = '';
@@ -321,14 +358,14 @@ function render() {
     marquee = (base.slice(idx) + base.slice(0, idx));
   } else if (win) {
     showMarquee = true;
-    const msg = 'STAGE⠤CLEAR⠤⠤⠤⚑⠤⠤⠤⛫⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
+    const msg = 'STAGE⠤CLEAR⠤⠤⠤⠤⠤⚑⠤⠤⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
     const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
     const idx = Math.floor(marqueeOffset) % base.length;
     marquee = (base.slice(idx) + base.slice(0, idx));
   }
   // If marquee active, overlay it into the scene to the right of the player
   if (showMarquee) {
-    const start = Math.min(PLAYER_POS + 1, SCENE_LENGTH);
+    const start = Math.min(Math.floor(playerPos) + 1, SCENE_LENGTH);
     const spaceRight = Math.max(0, SCENE_LENGTH - start);
     const overlay = marquee.slice(0, spaceRight);
     for (let i = 0; i < overlay.length; i++) {
@@ -350,6 +387,11 @@ function render() {
       document.title = s;
     }
   }
+  // Also mirror the exact game string into the in-page URL display
+  try {
+    const ud = document.getElementById('url-display');
+    if (ud) ud.textContent = s;
+  } catch {}
 }
 
 let lastTime = performance.now();
@@ -455,11 +497,22 @@ function update(dt) {
   // Horizontal movement with pipe collision on ground and coin rules in air
   const prevOffset = offset;
   const prevY = y; // track previous vertical position to detect landings
-  let intended = offset + dir * SPEED * dt;
+  // Allow on-screen sliding only near the start so the rest of the time the player stays centered
+  let skipOffsetMove = false;
+  if (!isUnderground && offset < 1 && dir !== 0) {
+    if ((dir < 0 && playerPos > 0) || (dir > 0 && playerPos < PLAYER_POS)) {
+      let intendedPlayerPos = playerPos + dir * SPEED * dt;
+      if (intendedPlayerPos < 0) intendedPlayerPos = 0;
+      if (intendedPlayerPos > PLAYER_POS) intendedPlayerPos = PLAYER_POS;
+      playerPos = intendedPlayerPos;
+      skipOffsetMove = true; // keep camera fixed while sliding on screen
+    }
+  }
+  let intended = offset + (skipOffsetMove ? 0 : dir * SPEED * dt);
   if (intended < 0) intended = 0;
-  const nextIndex = Math.floor(intended) + PLAYER_POS;
+  const nextIndex = Math.floor(intended) + Math.floor(playerPos);
   const nextTile = getTileAt(nextIndex);
-  const currIndex = Math.floor(offset) + PLAYER_POS;
+  const currIndex = Math.floor(offset) + Math.floor(playerPos);
   const currTile = getTileAt(currIndex);
   // Ground: block by pipes (except inverted ⠭/⠯ underground) and underground walls, and cap by last underground pipe
   if (y === 0) {
@@ -495,6 +548,10 @@ function update(dt) {
     }
   }
   offset = intended;
+  // Away from start region, maintain centered player
+  if (offset >= 1) playerPos = PLAYER_POS;
+  // Underground always centered (walls at indices 0..2)
+  if (isUnderground) playerPos = PLAYER_POS;
 
   vy += GRAVITY * dt;
   y += vy * dt;
@@ -523,7 +580,7 @@ function update(dt) {
     }
   }
 
-  const playerIndex = Math.floor(offset) + PLAYER_POS;
+  const playerIndex = Math.floor(offset) + Math.floor(playerPos);
   const currentTile = getTileAt(playerIndex);
   // Exit underground when jumping at the LAST inverted pipe (⠭/⠯): run reverse animation
   if (isUnderground && y > 0 && currentTile === PIPE_CHAR && !(pipeAnim && pipeAnim.phase)) {
@@ -671,6 +728,7 @@ function init() {
   updateScoreHUD();
   updateInstructionsHUD();
   setupShare();
+  setupUrlControls();
   requestAnimationFrame(tick);
 }
 
