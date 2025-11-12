@@ -218,7 +218,7 @@ function setupUrlControls() {
   if (!display || !minus || !plus) return;
   let size = 14;
   try {
-    const stored = parseInt(localStorage.getItem('urlFontSize') || '12', 10);
+    const stored = parseInt(localStorage.getItem('urlFontSize') || '14', 10);
     if (!Number.isNaN(stored)) size = stored;
   } catch {}
   function apply() {
