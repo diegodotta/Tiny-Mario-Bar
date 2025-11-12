@@ -49,6 +49,8 @@ let gameOver = false;
 let win = false;
 let coins = 0;
 let started = false; // game starts after first input
+let timeLeft = 60; // seconds remaining on the level timer
+let timedOut = false; // whether game over was caused by time running out
 
 const SPEED = 10;
 const GRAVITY = -30;
@@ -56,15 +58,17 @@ const JUMP_VELOCITY = 6;
 const ENEMY_SPEED = 2; // tiles per second
 const MARQUEE_SPEED = 10; // chars per second for rolling text
 let marqueeOffset = 0; // rolling text character offset
+const TIME_TICK_RATE = 1; // seconds per second (real-time countdown)
+const TIME_DRAIN_RATE = 20; // coins per second gained from remaining time after win
 
 // Audio
 let music = new Audio('sound/soundtrack.mp3');
 music.loop = true;
 music.volume = 0.3;
 let sfxJump = new Audio('sound/jump.mp3');
-sfxJump.volume = 0.5;
+sfxJump.volume = 0.3;
 let sfxCoin = new Audio('sound/coin.mp3');
-sfxCoin.volume = 0.5;
+sfxCoin.volume = 0.7;
 let sfxDie = new Audio('sound/death.mp3');
 sfxDie.volume = 0.5;
 let sfxClear = new Audio('sound/stage_clear.mp3');
@@ -167,24 +171,26 @@ function render() {
   const status = win ? '' : '';
   const coinNum = String(coins % 100).padStart(2, '0');
   const coinStr = `(🟡${coinNum})`;
+  const timeNum = String(Math.floor(timeLeft) % 100).padStart(2, '0');
+  const timeStr = `(⏱${timeNum})`;
   // Rolling marquee messages for start and game over
   let showMarquee = false;
   let marquee = '';
   if (!started && !gameOver && !win) {
     showMarquee = true;
-    const msg = 'PRESS⠤SPACE⠤TO⠤START';
+    const msg = 'PRESS⠤UP⠤TO⠤START';
     const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
     const idx = Math.floor(marqueeOffset) % base.length;
     marquee = (base.slice(idx) + base.slice(0, idx));
   } else if (gameOver) {
     showMarquee = true;
-    const msg = 'GAME⠤OVER⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
+    const msg = timedOut ? 'TIME⠤UP⠤⠤⠤⠤PRESS⠤R⠤TO⠤RESTART' : 'GAME⠤OVER⠤⠤⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
     const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
     const idx = Math.floor(marqueeOffset) % base.length;
     marquee = (base.slice(idx) + base.slice(0, idx));
   } else if (win) {
     showMarquee = true;
-    const msg = 'CONGRATULATIONS⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
+    const msg = 'STAGE⠤CLEAR⠤⠤⠤⚑⠤⠤⠤⛫⠤⠤⠤PRESS⠤R⠤TO⠤RESTART';
     const base = (msg + '⠤'.repeat(SCENE_LENGTH/2));
     const idx = Math.floor(marqueeOffset) % base.length;
     marquee = (base.slice(idx) + base.slice(0, idx));
@@ -201,7 +207,7 @@ function render() {
       }
     }
   }
-  const s = coinStr + chars.join('') + status;
+  const s = coinStr + timeStr + chars.join('') + status;
   const now = performance.now() / 1000;
   if (s !== lastUrlString && (now - lastUrlUpdate) >= URL_UPDATE_INTERVAL) {
     lastUrlString = s;
@@ -224,6 +230,17 @@ function tick(t) {
   if (marqueeOffset > 1e9) marqueeOffset = marqueeOffset % 1000; // prevent unbounded growth
   // Only update physics after the game has started and while active
   if (started && !gameOver && !win) update(dt);
+  // Drain remaining time into coins after win
+  if (win && timeLeft > 0) {
+    const before = Math.floor(timeLeft);
+    timeLeft = Math.max(0, timeLeft - TIME_DRAIN_RATE * dt);
+    const after = Math.floor(timeLeft);
+    const gained = before - after;
+    if (gained > 0) {
+      coins += gained;
+      try { sfxCoin.currentTime = 0; sfxCoin.play(); } catch {}
+    }
+  }
   render();
   requestAnimationFrame(tick);
 }
@@ -282,11 +299,13 @@ function update(dt) {
   const currentTile = getTileAt(playerIndex);
   // Win if touching flag
   if (currentTile === FLAG_CHAR) {
-    win = true;
-    dir = 0; vy = 0;
-    try { music.pause(); } catch {}
-    try { sfxClear.currentTime = 0; sfxClear.play(); } catch {}
-    return;
+    if (!win) {
+      win = true;
+      dir = 0; vy = 0;
+      try { music.pause(); } catch {}
+      try { sfxClear.currentTime = 0; sfxClear.play(); } catch {}
+    }
+    // continue update; other interactions are irrelevant once won
   }
   // Enemy interactions using dynamic enemy positions
   const enemyIndex = enemies.findIndex((e) => e.idx === playerIndex);
@@ -334,6 +353,20 @@ function update(dt) {
     // Reset jump start upon landing
     jumpStartIndex = -1;
   }
+  // Level timer countdown (only while playing)
+  if (started && !gameOver && !win && timeLeft > 0) {
+    const before = timeLeft;
+    timeLeft = Math.max(0, timeLeft - TIME_TICK_RATE * dt);
+    if (before > 0 && timeLeft === 0) {
+      // Timeout -> game over
+      timedOut = true;
+      gameOver = true;
+      dir = 0; vy = 0;
+      try { music.pause(); } catch {}
+      try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
+      return;
+    }
+  }
 }
 
 function init() {
@@ -363,6 +396,7 @@ function resetGame() {
   coins = 0;
   started = true; // immediately start after restart
   marqueeOffset = 0;
+  timeLeft = 60;
   if (initialWorld) world = initialWorld;
   // Rebuild enemies from the reset world and clear them from tiles
   enemies = [];
