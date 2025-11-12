@@ -36,6 +36,7 @@
 .tiny-mario .hud-button:hover { background: #f0f0f0; }
 .tiny-mario #share { margin-right: 20px; }
 .tiny-mario .hud-credits { color: #666; border-top: 1px solid var(--border-color); }
+.tiny-mario .hud-credits:before { content: '👲🏻';  }
 .tiny-mario .controls {
   display: grid;
   grid-template-areas:
