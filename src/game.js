@@ -1,4 +1,5 @@
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 const SCENE_LENGTH = isMobile ? 40 : 50;
 const PLAYER_POS = 3;
@@ -39,6 +40,56 @@ function loadWorldFromGlobal() {
     return String(window.LEVEL_WORLD_1_1);
   }
   return null;
+}
+
+function setupMobileControls() {
+  const ctrls = document.getElementById('mobile-controls');
+  if (!ctrls) return;
+  ctrls.style.display = isMobile ? 'grid' : 'none';
+  if (!isMobile) return;
+  const map = {
+    up: 'ArrowUp',
+    down: 'ArrowDown',
+    left: 'ArrowLeft',
+    right: 'ArrowRight',
+  };
+  function bind(id, key) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const kd = () => onKeyDown({ key });
+    const ku = () => onKeyUp({ key });
+    if (id === 'up') {
+      const handlePress = (e) => {
+        e.preventDefault();
+        if (gameOver || win) {
+          resetGame();
+        } else {
+          kd();
+        }
+      };
+      const handleRelease = (e) => { e.preventDefault(); if (!(gameOver || win)) ku(); };
+      el.addEventListener('touchstart', handlePress, { passive: false });
+      el.addEventListener('touchend', handleRelease, { passive: false });
+      el.addEventListener('mousedown', handlePress);
+      el.addEventListener('mouseup', handleRelease);
+      el.addEventListener('mouseleave', handleRelease);
+    } else {
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); kd(); }, { passive: false });
+      el.addEventListener('touchend', (e) => { e.preventDefault(); ku(); }, { passive: false });
+      el.addEventListener('mousedown', (e) => { e.preventDefault(); kd(); });
+      el.addEventListener('mouseup', (e) => { e.preventDefault(); ku(); });
+      el.addEventListener('mouseleave', (e) => { e.preventDefault(); ku(); });
+    }
+  }
+  Object.entries(map).forEach(([id, key]) => bind(id, key));
+  // Set initial label
+  updateMobileUpLabel();
+}
+
+function updateMobileUpLabel() {
+  const upBtn = document.getElementById('up');
+  if (!upBtn) return;
+  upBtn.textContent = (gameOver || win) ? 'R' : '▲︎';
 }
 
 function loadWorldInline() {
@@ -124,13 +175,13 @@ function updateInstructionsHUD() {
   const el = document.getElementById('instructions');
   if (!el) return;
   if (win) {
-    el.textContent = 'Stage Clear — Press R to restart';
+    el.textContent = 'Stage Clear · Press R to restart';
   } else if (gameOver) {
-    el.textContent = timedOut ? 'Time Up — Press R to restart' : 'Game Over — Press R to restart';
+    el.textContent = timedOut ? 'Time Up · Press R to restart' : 'Game Over · Press R to restart';
   } else if (!started) {
-    el.textContent = 'Press UP to start · R to restart';
+    el.textContent = isMobile ? 'Press UP to start' : 'Press UP arrow to start the game on your URL bar';
   } else {
-    el.textContent = 'Use ←/→ to move · UP to jump · R to restart';
+    el.textContent = 'Use arrow keys to move';
   }
 }
 function maybeUpdateBest() {
@@ -251,11 +302,11 @@ if (urlRow) {
 if (toggle && urlRow) {
   // Set initial label based on current visibility
   const currentlyVisible = urlRow.style.display !== 'none';
-  toggle.textContent = currentlyVisible ? 'Hide URL Bar' : 'Show URL Bar';
+  toggle.textContent = currentlyVisible ? 'Hide URL' : 'Show URL';
   toggle.addEventListener('click', () => {
     const visible = urlRow.style.display !== 'none';
     urlRow.style.display = visible ? 'none' : '';
-    toggle.textContent = visible ? 'Show URL Bar' : 'Hide URL Bar';
+    toggle.textContent = visible ? 'Show URL' : 'Hide URL';
   });
 }
 
@@ -606,6 +657,7 @@ function update(dt) {
       try { musicUnderground.pause(); } catch {}
       try { sfxClear.currentTime = 0; sfxClear.play(); } catch {}
       updateInstructionsHUD();
+      updateMobileUpLabel();
     }
     // continue update; other interactions are irrelevant once won
   }
@@ -629,6 +681,7 @@ function update(dt) {
     dir = 0; vy = 0;
     try { music.pause(); } catch {}
     try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
+    updateMobileUpLabel();
     return;
   }
   // Collect coin only when ascending from directly below the coin you jumped under
@@ -657,6 +710,7 @@ function update(dt) {
     try { musicUnderground.pause(); } catch {}
     try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
     updateInstructionsHUD();
+    updateMobileUpLabel();
     return;
   }
   // When on ground (non-hole), clamp vertical velocity
@@ -678,6 +732,7 @@ function update(dt) {
       try { musicUnderground.pause(); } catch {}
       try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
       updateInstructionsHUD();
+      updateMobileUpLabel();
       return;
     }
   }
@@ -728,7 +783,18 @@ function init() {
   updateScoreHUD();
   updateInstructionsHUD();
   setupShare();
+  // Initialize URL HUD visibility per platform
+  try {
+    const urlRow = document.querySelector('.hud-url');
+    const toggleBtn = document.getElementById('toggle-url');
+    if (urlRow) {
+      const shouldShow = isMobile || isSafari;
+      urlRow.style.display = shouldShow ? 'flex' : 'none';
+      if (toggleBtn) toggleBtn.textContent = shouldShow ? 'Hide URL' : 'Show URL';
+    }
+  } catch {}
   setupUrlControls();
+  setupMobileControls();
   requestAnimationFrame(tick);
 }
 
@@ -767,4 +833,5 @@ function resetGame() {
   updateScoreHUD();
   timedOut = false;
   updateInstructionsHUD();
+  updateMobileUpLabel();
 }

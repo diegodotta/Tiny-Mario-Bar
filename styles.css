@@ -18,7 +18,7 @@
   flex: 1 1 auto;
   border-bottom: 1px solid #eee;
   white-space: pre;
-  overflow-x: auto;
+  overflow-x: hidden;
   
 }
 .tiny-mario .url-zoom { display: inline-flex; gap: 6px; border-bottom: 1px solid #eee; }
@@ -32,3 +32,27 @@
 .tiny-mario .hud-button { padding: 2px 8px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; white-space: nowrap; flex: 0 0 auto; }
 .tiny-mario .hud-button:hover { background: #f0f0f0; }
 .tiny-mario #share { margin-right: 20px; }
+
+.tiny-mario .controls.touch-only {
+  display: grid;
+  grid-template-areas:
+    ". up ."
+    "left down right";
+  width: 75vmin;
+  height: 50vmin;
+  margin: 10px auto;
+  padding-top: 30vh;
+}
+.tiny-mario .controls button {
+  color: #888;
+  font-size: 8vmin;
+  background: none;
+  border: 2px solid;
+  margin: 2px;
+  padding: 0;  border-radius: 5vmin;
+}
+
+.tiny-mario #up { grid-area: up; }
+.tiny-mario #left { grid-area: left; }
+.tiny-mario #down { grid-area: down; }
+.tiny-mario #right { grid-area: right; }
