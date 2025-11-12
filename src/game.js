@@ -9,6 +9,12 @@
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
+// Animation frame constants
+const PIPE_ENTER_OVER_FRAMES = ['⠶','⠴','⠲'];
+const PIPE_ENTER_UNDER_FRAMES = ['⠭','⠬','⠯'];
+const PIPE_EXIT_OVER_FRAMES  = ['⠲','⠴','⠶'];
+const PIPE_EXIT_UNDER_FRAMES = ['⠯','⠬','⠭'];
+
 const SCENE_LENGTH = isMobile ? 40 : 60;
 const PLAYER_POS = 3;
 const GROUND_CHAR = '⠤';
@@ -30,14 +36,32 @@ let initialWorld = '';
 let enemies = []; // { idx: number, dir: -1|1 }
 let undergroundWorld = '';
 let undergroundRaw = '';
+let undergroundRawInitial = '';
 let isUnderground = false;
 let prevOverworldOffset = 0;
 let undergroundPipeIndices = [];
 let undergroundVisited = false;
 let pipeAnim = null; // {phase:'over'|'under', frames:string[], idx:number, t:number, underStartOffset:number}
 let playerPos = PLAYER_POS; // dynamic screen position (0..PLAYER_POS), default anchored at 3
+let overworldPipeIndices = [];
 
 const DEFAULT_WORLD = GROUND_CHAR.repeat(200);
+
+function rebuildUndergroundFromRaw() {
+  undergroundWorld = undergroundRaw
+    .split('')
+    .map((ch) => {
+      if (ch === '⠿') return GROUND_CHAR;
+      if (ch === '⠭' || ch === '⠯') return PIPE_CHAR;
+      if (ch === '⠻' || ch === '⠽') return GROUND_CHAR;
+      return ch;
+    })
+    .join('');
+  undergroundPipeIndices = [];
+  for (let i = 0; i < undergroundWorld.length; i++) {
+    if (undergroundWorld[i] === PIPE_CHAR) undergroundPipeIndices.push(i);
+  }
+}
 
 function loadWorldFromGlobal() {
   if (typeof window !== 'undefined' && window.LEVEL_WORLD_1_1) {
@@ -93,6 +117,7 @@ function setupMobileControls() {
 function updateMobileUpLabel() {
   const upBtn = document.getElementById('up');
   if (!upBtn) return;
+  if (!isMobile) return;
   upBtn.textContent = (gameOver || win) ? 'R' : '▲︎';
 }
 
@@ -130,25 +155,26 @@ const TIME_DRAIN_RATE = 20; // coins per second gained from remaining time after
 const PIPE_ANIM_FRAME_DUR = 0.12; // seconds per frame for pipe entry animation
 
 // Audio
-let music = new Audio(domain + '/sound/soundtrack.mp3');
+const base = (typeof domain === 'string' && domain) ? domain : '.';
+let music = new Audio(base + '/sound/soundtrack.mp3');
 music.loop = true;
 music.volume = 0.3;
-let musicUnderground = new Audio(domain + '/sound/underground.mp3');
+let musicUnderground = new Audio(base + '/sound/underground.mp3');
 musicUnderground.loop = true;
 musicUnderground.volume = 0.3;
-let sfxJump = new Audio(domain + '/sound/jump.mp3');
+let sfxJump = new Audio(base + '/sound/jump.mp3');
 sfxJump.volume = 0.3;
-let sfxCoin = new Audio(domain + '/sound/coin.mp3');
+let sfxCoin = new Audio(base + '/sound/coin.mp3');
 sfxCoin.volume = 0.7;
-let sfxPipe = new Audio(domain + '/sound/pipe.wav');
+let sfxPipe = new Audio(base + '/sound/pipe.wav');
 sfxPipe.volume = 0.7;
-let sfxDie = new Audio(domain + '/sound/death.mp3');
+let sfxDie = new Audio(base + '/sound/death.mp3');
 sfxDie.volume = 0.5;
-let sfxClear = new Audio(domain + '/sound/stage_clear.mp3');
+let sfxClear = new Audio(base + '/sound/stage_clear.mp3');
 sfxClear.volume = 0.5;
 let sfxStomp = null; // optional separate stomp sound
 try {
-  sfxStomp = new Audio(domain + '/sound/stomp.mp3');
+  sfxStomp = new Audio(base + '/sound/stomp.mp3');
   sfxStomp.volume = 0.5;
 } catch {}
 
@@ -183,7 +209,7 @@ function updateInstructionsHUD() {
   } else if (gameOver) {
     el.textContent = timedOut ? 'Time Up · Press R to restart' : 'Game Over · Press R to restart';
   } else if (!started) {
-    el.textContent = isMobile ? 'Press UP to start' : 'Press UP arrow to start the game on your URL bar';
+    el.textContent = isMobile ? 'Press UP to start' : 'Press UP arrow to start 👲🏻 Tiny Mario on your URL bar';
   } else {
     el.textContent = 'Use arrow keys to move';
   }
@@ -248,10 +274,8 @@ function onKeyDown(e) {
   if ((e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') && !isUnderground && !(pipeAnim && pipeAnim.phase)) {
     const playerIndex = Math.floor(offset) + Math.floor(playerPos);
     const tile = getTileAt(playerIndex);
-    // Compute 4th overworld pipe index dynamically
-    const pipes = [];
-    for (let i = 0; i < world.length; i++) if (world[i] === PIPE_CHAR) pipes.push(i);
-    const entryPipeIdx = pipes.length >= 4 ? pipes[3] : -1;
+    // Use cached 4th overworld pipe index
+    const entryPipeIdx = overworldPipeIndices.length >= 4 ? overworldPipeIndices[3] : -1;
     // Entry is allowed only on the 4th overworld pipe
     if (y === 0 && tile === PIPE_CHAR && undergroundWorld && entryPipeIdx !== -1 && playerIndex === entryPipeIdx) {
       prevOverworldOffset = offset;
@@ -365,18 +389,18 @@ function render() {
     let frameGlyph = PLAYER_CHAR;
     if (pipeAnim.mode === 'enter') {
       if (pipeAnim.phase === 'over') {
-        const frames = pipeAnim.framesOver || pipeAnim.frames || ['⠶','⠴','⠲'];
+        const frames = pipeAnim.framesOver || pipeAnim.frames || PIPE_ENTER_OVER_FRAMES;
         frameGlyph = frames[Math.min(pipeAnim.idx, frames.length - 1)];
       } else {
-        const framesUnder = ['⠭','⠬','⠯'];
+        const framesUnder = PIPE_ENTER_UNDER_FRAMES;
         frameGlyph = framesUnder[Math.min(pipeAnim.idx, framesUnder.length - 1)];
       }
     } else if (pipeAnim.mode === 'exit') {
       if (pipeAnim.phase === 'under') {
-        const framesUnderExit = ['⠯','⠬','⠭'];
+        const framesUnderExit = PIPE_EXIT_UNDER_FRAMES;
         frameGlyph = framesUnderExit[Math.min(pipeAnim.idx, framesUnderExit.length - 1)];
       } else {
-        const framesOverExit = ['⠲','⠴','⠶'];
+        const framesOverExit = PIPE_EXIT_OVER_FRAMES;
         frameGlyph = framesOverExit[Math.min(pipeAnim.idx, framesOverExit.length - 1)];
       }
     }
@@ -436,12 +460,12 @@ function render() {
     } catch (e) {
       document.title = s;
     }
+    // Mirror into in-page URL display at the same throttled cadence
+    try {
+      const ud = document.getElementById('url-display');
+      if (ud) ud.textContent = s;
+    } catch {}
   }
-  // Also mirror the exact game string into the in-page URL display
-  try {
-    const ud = document.getElementById('url-display');
-    if (ud) ud.textContent = s;
-  } catch {}
 }
 
 let lastTime = performance.now();
@@ -488,13 +512,9 @@ function tick(t) {
           // Switch to overworld now and start over-phase exit frames
           world = initialWorld;
           isUnderground = false;
-          // Place at the pipe immediately after the 4th overworld pipe (i.e., the 5th overall)
+          // Place at 5th overworld pipe (cached), fallback to previous offset if missing
           {
-            const pipesOver = [];
-            for (let i = 0; i < world.length; i++) if (world[i] === PIPE_CHAR) pipesOver.push(i);
-            const entryPipeIdx = pipesOver.length >= 4 ? pipesOver[3] : -1;
-            const nextPipeIdx = (entryPipeIdx !== -1) ? pipesOver.find((p, k) => k > 3) ?? -1 : -1;
-            const target = (nextPipeIdx !== -1) ? nextPipeIdx : (pipesOver.length >= 5 ? pipesOver[4] : -1);
+            const target = overworldPipeIndices.length >= 5 ? overworldPipeIndices[4] : -1;
             if (target !== -1) {
               offset = Math.max(0, target - PLAYER_POS);
             } else {
@@ -737,28 +757,17 @@ function init() {
   const loaded = loadWorldFromGlobal() || loadWorldInline();
   world = loaded && loaded.length ? loaded : DEFAULT_WORLD;
   initialWorld = world;
+  // Cache overworld pipe indices from the initial world
+  overworldPipeIndices = [];
+  for (let i = 0; i < initialWorld.length; i++) {
+    if (initialWorld[i] === PIPE_CHAR) overworldPipeIndices.push(i);
+  }
   // Prepare underground world if present
   try {
     if (typeof window !== 'undefined' && window.LEVEL_WORLD_1_1_UNDERGROUND) {
       undergroundRaw = String(window.LEVEL_WORLD_1_1_UNDERGROUND);
-      // Map underground glyphs to engine tiles (new legend) for logic
-      undergroundWorld = undergroundRaw
-        .split('')
-        .map((ch) => {
-          // wall -> treat as ground (pass-through background)
-          if (ch === '⠿') return GROUND_CHAR;
-          // inverted pipe or pipe+player -> pipe
-          if (ch === '⠭' || ch === '⠯') return PIPE_CHAR;
-          // ignore player markers -> ground
-          if (ch === '⠻' || ch === '⠽') return GROUND_CHAR;
-          return ch; // fallback keep
-        })
-        .join('');
-      // compute pipe indices in underground and last pipe index
-      undergroundPipeIndices = [];
-      for (let i = 0; i < undergroundWorld.length; i++) {
-        if (undergroundWorld[i] === PIPE_CHAR) undergroundPipeIndices.push(i);
-      }
+      undergroundRawInitial = undergroundRaw;
+      rebuildUndergroundFromRaw();
     }
   } catch {}
   // Extract enemies from world into dynamic list and clear them from world tiles
@@ -805,6 +814,11 @@ function resetGame() {
   isUnderground = false;
   prevOverworldOffset = 0;
   undergroundVisited = false;
+  // Restore underground visuals and logic to initial state
+  if (undergroundRawInitial) {
+    undergroundRaw = undergroundRawInitial;
+    rebuildUndergroundFromRaw();
+  }
   // Rebuild enemies from the reset world and clear them from tiles
   enemies = [];
   for (let i = 0; i < world.length; i++) {
@@ -818,6 +832,7 @@ function resetGame() {
   lastUrlUpdate = 0;
   try { sfxDie.pause(); sfxDie.currentTime = 0; } catch {}
   try { sfxClear.pause(); sfxClear.currentTime = 0; } catch {}
+  try { musicUnderground.pause(); musicUnderground.currentTime = 0; } catch {}
   try { music.currentTime = 0; music.play(); } catch {}
   updateHighHUD();
   updateScoreHUD();
