@@ -19,6 +19,17 @@ const COIN_ENEMY_CHAR = 'ȯ';
 let world = '';
 let initialWorld = '';
 let enemies = []; // { idx: number, dir: -1|1 }
+let undergroundWorld = '';
+let undergroundRaw = '';
+let isUnderground = false;
+let prevOverworldOffset = 0;
+let lastPipeUndergroundIndex = -1;
+let firstPipeOverworldIndex = -1;
+let undergroundPipeIndices = [];
+let undergroundVisited = false;
+let overworldPipeIndices = [];
+let exitPipeUndergroundIndex = -1;
+let pipeAnim = null; // {phase:'over'|'under', frames:string[], idx:number, t:number, underStartOffset:number}
 
 const DEFAULT_WORLD = GROUND_CHAR.repeat(200);
 
@@ -60,15 +71,21 @@ const MARQUEE_SPEED = 10; // chars per second for rolling text
 let marqueeOffset = 0; // rolling text character offset
 const TIME_TICK_RATE = 1; // seconds per second (real-time countdown)
 const TIME_DRAIN_RATE = 20; // coins per second gained from remaining time after win
+const PIPE_ANIM_FRAME_DUR = 0.12; // seconds per frame for pipe entry animation
 
 // Audio
 let music = new Audio('sound/soundtrack.mp3');
 music.loop = true;
 music.volume = 0.3;
+let musicUnderground = new Audio('sound/underground.mp3');
+musicUnderground.loop = true;
+musicUnderground.volume = 0.3;
 let sfxJump = new Audio('sound/jump.mp3');
 sfxJump.volume = 0.3;
 let sfxCoin = new Audio('sound/coin.mp3');
 sfxCoin.volume = 0.7;
+let sfxPipe = new Audio('sound/pipe.wav');
+sfxPipe.volume = 0.7;
 let sfxDie = new Audio('sound/death.mp3');
 sfxDie.volume = 0.5;
 let sfxClear = new Audio('sound/stage_clear.mp3');
@@ -85,8 +102,65 @@ const URL_UPDATE_INTERVAL = 1 / 12; // seconds
 
 const keys = new Set();
 let jumpStartIndex = -1; // track where the player initiated the jump
+// High score (best coins) and HUD helpers
+let bestCoins = 0;
+try { bestCoins = parseInt(localStorage.getItem('bestCoins') || '0', 10) || 0; } catch {}
+function updateHighHUD() {
+  const el = document.getElementById('high');
+  if (el) {
+    const n = String(bestCoins % 100).padStart(2, '0');
+    el.textContent = `High Score ${n}`;
+  }
+}
+function updateScoreHUD() {
+  const el = document.getElementById('score');
+  if (el) {
+    const n = String(coins % 100).padStart(2, '0');
+    el.textContent = `Score: ${n}`;
+  }
+}
+function updateInstructionsHUD() {
+  const el = document.getElementById('instructions');
+  if (!el) return;
+  if (win) {
+    el.textContent = 'Stage Clear — Press R to restart';
+  } else if (gameOver) {
+    el.textContent = timedOut ? 'Time Up — Press R to restart' : 'Game Over — Press R to restart';
+  } else if (!started) {
+    el.textContent = 'Press UP to start · R to restart';
+  } else {
+    el.textContent = 'Use ←/→ to move · UP to jump · R to restart';
+  }
+}
+function maybeUpdateBest() {
+  if (coins > bestCoins) {
+    bestCoins = coins;
+    try { localStorage.setItem('bestCoins', String(bestCoins)); } catch {}
+    updateHighHUD();
+  }
+}
+function setupShare() {
+  const btn = document.getElementById('share');
+  if (!btn) return;
+  btn.onclick = async () => {
+    const text = `🍄👲🏻🏰 I scored ${coins} coins in Tiny Mario Bar! https://diego.horse/tiny-mario`;
+    try {
+      if (navigator.share) {
+        await navigator.clipboard.writeText(`${text}`);
+        const prev = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+
+        await navigator.share({  text, url });
+      
+      
+      }
+    } catch {}
+  };
+}
 function onKeyDown(e) {
   keys.add(e.key);
+  try { console.debug('[key]', e.key); } catch {}
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dir = -1;
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 1;
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
@@ -96,10 +170,44 @@ function onKeyDown(e) {
       jumpStartIndex = Math.floor(offset) + PLAYER_POS;
     }
   }
+  // Enter underground with DOWN/S while on the first overworld pipe
+  if ((e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') && !isUnderground && !(pipeAnim && pipeAnim.phase)) {
+    const playerIndex = Math.floor(offset) + PLAYER_POS;
+    const tile = getTileAt(playerIndex);
+    // Compute 4th overworld pipe index dynamically
+    const pipes = [];
+    for (let i = 0; i < world.length; i++) if (world[i] === PIPE_CHAR) pipes.push(i);
+    const entryPipeIdx = pipes.length >= 4 ? pipes[3] : -1;
+    try {
+      console.debug('[down]', { y, tile, playerIndex, entryPipeOverworldIndex: entryPipeIdx, hasUnderground: !!undergroundWorld });
+    } catch {}
+    // Entry is allowed only on the 4th overworld pipe
+    if (y === 0 && tile === PIPE_CHAR && undergroundWorld && entryPipeIdx !== -1 && playerIndex === entryPipeIdx) {
+      try { console.debug('[underground] entering anim'); } catch {}
+      prevOverworldOffset = offset;
+      // compute target offset for underground start now
+      let underStartOffset = 0;
+      if (undergroundVisited && undergroundPipeIndices.length >= 4) {
+        const targetIndex = undergroundPipeIndices[3];
+        underStartOffset = Math.max(0, targetIndex - PLAYER_POS);
+      }
+      pipeAnim = {
+        mode: 'enter',
+        phase: 'over',
+        framesOver: ['⠶','⠴','⠲'],
+        idx: 0,
+        t: 0,
+        underStartOffset,
+      };
+      try { sfxPipe.currentTime = 0; sfxPipe.play(); } catch {}
+      try { music.pause(); } catch {}
+    }
+  }
   // First input starts the game loop updates
   if (!started && (e.key === ' ' || e.key.startsWith('Arrow') || e.key.toLowerCase() === 'a' || e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'w')) {
     started = true;
     try { music.currentTime = 0; music.play(); } catch {}
+    updateInstructionsHUD();
   }
   if (e.key === 'r' || e.key === 'R') {
     resetGame();
@@ -130,10 +238,11 @@ function render() {
   const i1 = i0 + SCENE_LENGTH;
   let slice = '';
   if (i1 <= world.length) {
-    slice = world.slice(i0, i1);
+    slice = isUnderground && undergroundRaw ? undergroundRaw.slice(i0, i1) : world.slice(i0, i1);
   } else {
-    slice = world.slice(i0);
-    slice += GROUND_CHAR.repeat(i1 - world.length);
+    slice = isUnderground && undergroundRaw ? undergroundRaw.slice(i0) : world.slice(i0);
+    const padLen = i1 - world.length;
+    slice += (isUnderground ? '⠿' : GROUND_CHAR).repeat(padLen);
   }
   const chars = slice.split('');
   // Overlay enemies into chars for display
@@ -149,7 +258,7 @@ function render() {
   if (y > 0) {
     // While airborne, show pipe variant if above a pipe, else jump variant
     if (tileUnderPlayer === PIPE_CHAR) {
-      chars[PLAYER_POS] = PIPE_PLAYER_CHAR;
+      chars[PLAYER_POS] = isUnderground ? '⠯' : PIPE_PLAYER_CHAR;
     } else if (enemyHere) {
       chars[PLAYER_POS] = JUMP_ENEMY_CHAR;
     } else {
@@ -157,12 +266,34 @@ function render() {
     }
   } else {
     if (tileUnderPlayer === PIPE_CHAR) {
-      chars[PLAYER_POS] = PIPE_PLAYER_CHAR;
+      chars[PLAYER_POS] = isUnderground ? '⠯' : PIPE_PLAYER_CHAR;
     } else if (tileUnderPlayer === COIN_CHAR) {
       chars[PLAYER_POS] = COIN_PLAYER_CHAR;
     } else {
       chars[PLAYER_POS] = PLAYER_CHAR;
     }
+  }
+  // Override player glyph while pipe animation is active
+  if (pipeAnim && pipeAnim.phase) {
+    let frameGlyph = PLAYER_CHAR;
+    if (pipeAnim.mode === 'enter') {
+      if (pipeAnim.phase === 'over') {
+        const frames = pipeAnim.framesOver || pipeAnim.frames || ['⠶','⠴','⠲'];
+        frameGlyph = frames[Math.min(pipeAnim.idx, frames.length - 1)];
+      } else {
+        const framesUnder = ['⠭','⠬','⠯'];
+        frameGlyph = framesUnder[Math.min(pipeAnim.idx, framesUnder.length - 1)];
+      }
+    } else if (pipeAnim.mode === 'exit') {
+      if (pipeAnim.phase === 'under') {
+        const framesUnderExit = ['⠯','⠬','⠭'];
+        frameGlyph = framesUnderExit[Math.min(pipeAnim.idx, framesUnderExit.length - 1)];
+      } else {
+        const framesOverExit = ['⠲','⠴','⠶'];
+        frameGlyph = framesOverExit[Math.min(pipeAnim.idx, framesOverExit.length - 1)];
+      }
+    }
+    chars[PLAYER_POS] = frameGlyph;
   }
   // On game over, show skull at the player's position
   if (gameOver) {
@@ -229,7 +360,80 @@ function tick(t) {
   marqueeOffset += MARQUEE_SPEED * dt;
   if (marqueeOffset > 1e9) marqueeOffset = marqueeOffset % 1000; // prevent unbounded growth
   // Only update physics after the game has started and while active
-  if (started && !gameOver && !win) update(dt);
+  if (started && !gameOver && !win && !(pipeAnim && pipeAnim.phase)) update(dt);
+  // Advance pipe animation frames and handle world switch mid-sequence
+  if (pipeAnim && pipeAnim.phase) {
+    pipeAnim.t += dt;
+    if (pipeAnim.t >= PIPE_ANIM_FRAME_DUR) {
+      pipeAnim.t = 0;
+      pipeAnim.idx++;
+      try { console.debug('[pipeAnim]', pipeAnim.phase, 'idx', pipeAnim.idx); } catch {}
+      if (pipeAnim.mode === 'enter') {
+        const overLen = (pipeAnim.framesOver || pipeAnim.frames || ['⠶','⠴','⠲']).length;
+        if (pipeAnim.phase === 'over' && pipeAnim.idx >= overLen) {
+          // Switch to underground and start the underground-side animation
+          try { console.debug('[pipeAnim] switching to underground'); } catch {}
+          world = undergroundWorld;
+          isUnderground = true;
+          offset = pipeAnim.underStartOffset;
+          // rebuild enemies for underground
+          enemies = [];
+          for (let i = 0; i < world.length; i++) {
+            if (world[i] === ENEMY_CHAR) {
+              enemies.push({ idx: i, dir: -1, acc: 0 });
+              setTileAt(i, GROUND_CHAR);
+            }
+          }
+          try { musicUnderground.currentTime = 0; musicUnderground.play(); } catch {}
+          undergroundVisited = true;
+          updateInstructionsHUD();
+          pipeAnim.phase = 'under';
+          pipeAnim.idx = 0;
+        } else if (pipeAnim.phase === 'under' && pipeAnim.idx >= 3) {
+          // Entry animation complete
+          pipeAnim = null;
+        }
+      } else if (pipeAnim.mode === 'exit') {
+        if (pipeAnim.phase === 'under' && pipeAnim.idx >= 3) {
+          // Switch to overworld now and start over-phase exit frames
+          try { console.debug('[pipeAnim] switching to overworld'); } catch {}
+          world = initialWorld;
+          isUnderground = false;
+          // Place at the pipe immediately after the 4th overworld pipe (i.e., the 5th overall)
+          {
+            const pipesOver = [];
+            for (let i = 0; i < world.length; i++) if (world[i] === PIPE_CHAR) pipesOver.push(i);
+            const entryPipeIdx = pipesOver.length >= 4 ? pipesOver[3] : -1;
+            const nextPipeIdx = (entryPipeIdx !== -1) ? pipesOver.find((p, k) => k > 3) ?? -1 : -1;
+            const target = (nextPipeIdx !== -1) ? nextPipeIdx : (pipesOver.length >= 5 ? pipesOver[4] : -1);
+            if (target !== -1) {
+              offset = Math.max(0, target - PLAYER_POS);
+            } else {
+              offset = prevOverworldOffset + 1;
+            }
+          }
+          // rebuild enemies for overworld
+          enemies = [];
+          for (let i = 0; i < world.length; i++) {
+            if (world[i] === ENEMY_CHAR) {
+              enemies.push({ idx: i, dir: -1, acc: 0 });
+              setTileAt(i, GROUND_CHAR);
+            }
+          }
+          try { musicUnderground.pause(); } catch {}
+          try { music.currentTime = 0; music.play(); } catch {}
+          updateInstructionsHUD();
+          pipeAnim.phase = 'over';
+          pipeAnim.idx = 0;
+        } else if (pipeAnim.phase === 'over') {
+          const overExitLen = 3; // ⠲ ⠴ ⠶
+          if (pipeAnim.idx >= overExitLen) {
+            pipeAnim = null;
+          }
+        }
+      }
+    }
+  }
   // Drain remaining time into coins after win
   if (win && timeLeft > 0) {
     const before = Math.floor(timeLeft);
@@ -239,6 +443,8 @@ function tick(t) {
     if (gained > 0) {
       coins += gained;
       try { sfxCoin.currentTime = 0; sfxCoin.play(); } catch {}
+      maybeUpdateBest();
+      updateScoreHUD();
     }
   }
   render();
@@ -255,10 +461,32 @@ function update(dt) {
   const nextTile = getTileAt(nextIndex);
   const currIndex = Math.floor(offset) + PLAYER_POS;
   const currTile = getTileAt(currIndex);
-  // Ground: only pipes block movement
+  // Ground: block by pipes (except inverted ⠭/⠯ underground) and underground walls, and cap by last underground pipe
   if (y === 0) {
     if (nextTile === PIPE_CHAR && currTile !== PIPE_CHAR) {
-      intended = prevOffset; // blocked by pipe front
+      // In underground, treat inverted pipes (⠭/⠯) as pass-through horizontally
+      let isPassThrough = false;
+      if (isUnderground && undergroundRaw) {
+        const rawCh = undergroundRaw[nextIndex] || '';
+        if (rawCh === '⠭' || rawCh === '⠯') isPassThrough = true;
+      }
+      if (!isPassThrough) {
+        intended = prevOffset; // blocked by pipe front
+      }
+    }
+    // In underground, walls (⠿) block horizontal movement
+    if (isUnderground && undergroundRaw) {
+      const rawCh = undergroundRaw[nextIndex] || '';
+      if (rawCh === '⠿') {
+        intended = prevOffset;
+      }
+      // Also prevent moving beyond the 5th underground pipe
+      const pipeIdxs = [];
+      for (let i = 0; i < world.length; i++) if (world[i] === PIPE_CHAR) pipeIdxs.push(i);
+      const fifthPipe = pipeIdxs.length >= 5 ? pipeIdxs[4] : -1;
+      if (fifthPipe !== -1 && nextIndex > fifthPipe) {
+        intended = prevOffset;
+      }
     }
   } else {
     // Airborne: block lateral entry into coins unless it's the coin directly above jump start
@@ -297,13 +525,30 @@ function update(dt) {
 
   const playerIndex = Math.floor(offset) + PLAYER_POS;
   const currentTile = getTileAt(playerIndex);
+  // Exit underground when jumping at the LAST inverted pipe (⠭/⠯): run reverse animation
+  if (isUnderground && y > 0 && currentTile === PIPE_CHAR && !(pipeAnim && pipeAnim.phase)) {
+    let lastInvIdx = -1;
+    if (undergroundRaw) {
+      for (let i = 0; i < undergroundRaw.length; i++) {
+        const ch = undergroundRaw[i];
+        if (ch === '⠭' || ch === '⠯') lastInvIdx = i;
+      }
+    }
+    if (lastInvIdx !== -1 && playerIndex === lastInvIdx) {
+      try { console.debug('[underground] exiting at last inverted pipe (anim)'); } catch {}
+      try { sfxPipe.currentTime = 0; sfxPipe.play(); } catch {}
+      pipeAnim = { mode: 'exit', phase: 'under', idx: 0, t: 0 };
+    }
+  }
   // Win if touching flag
   if (currentTile === FLAG_CHAR) {
     if (!win) {
       win = true;
       dir = 0; vy = 0;
       try { music.pause(); } catch {}
+      try { musicUnderground.pause(); } catch {}
       try { sfxClear.currentTime = 0; sfxClear.play(); } catch {}
+      updateInstructionsHUD();
     }
     // continue update; other interactions are irrelevant once won
   }
@@ -319,6 +564,8 @@ function update(dt) {
       const s = sfxStomp || sfxCoin;
       s.currentTime = 0; s.play();
     } catch {}
+    maybeUpdateBest();
+    updateScoreHUD();
   } else if (y === 0 && enemyIndex !== -1) {
     // Walking into an enemy on the ground kills the player
     gameOver = true;
@@ -338,13 +585,21 @@ function update(dt) {
     }
     // After collecting, prevent further coin checks tied to this jump index
     jumpStartIndex = -1;
+    maybeUpdateBest();
+    updateScoreHUD();
+    // Keep underground visuals in sync when collecting a coin
+    if (isUnderground && undergroundRaw && undergroundRaw[playerIndex] === '⠥') {
+      undergroundRaw = undergroundRaw.substring(0, playerIndex) + '⠤' + undergroundRaw.substring(playerIndex + 1);
+    }
   }
   // Immediate game over if landed in a hole
   if (y === 0 && currentTile === HOLE_CHAR) {
     gameOver = true;
     dir = 0; vy = 0;
     try { music.pause(); } catch {}
+    try { musicUnderground.pause(); } catch {}
     try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
+    updateInstructionsHUD();
     return;
   }
   // When on ground (non-hole), clamp vertical velocity
@@ -363,7 +618,9 @@ function update(dt) {
       gameOver = true;
       dir = 0; vy = 0;
       try { music.pause(); } catch {}
+      try { musicUnderground.pause(); } catch {}
       try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
+      updateInstructionsHUD();
       return;
     }
   }
@@ -373,6 +630,35 @@ function init() {
   const loaded = loadWorldFromGlobal() || loadWorldInline();
   world = loaded && loaded.length ? loaded : DEFAULT_WORLD;
   initialWorld = world;
+  // Determine the first pipe index in the overworld (for entry)
+  firstPipeOverworldIndex = initialWorld.indexOf(PIPE_CHAR);
+  try { console.debug('[init] firstPipeOverworldIndex', firstPipeOverworldIndex); } catch {}
+  // Prepare underground world if present
+  try {
+    if (typeof window !== 'undefined' && window.LEVEL_WORLD_1_1_UNDERGROUND) {
+      undergroundRaw = String(window.LEVEL_WORLD_1_1_UNDERGROUND);
+      // Map underground glyphs to engine tiles (new legend) for logic
+      undergroundWorld = undergroundRaw
+        .split('')
+        .map((ch) => {
+          // wall -> treat as ground (pass-through background)
+          if (ch === '⠿') return GROUND_CHAR;
+          // inverted pipe or pipe+player -> pipe
+          if (ch === '⠭' || ch === '⠯') return PIPE_CHAR;
+          // ignore player markers -> ground
+          if (ch === '⠻' || ch === '⠽') return GROUND_CHAR;
+          return ch; // fallback keep
+        })
+        .join('');
+      // compute pipe indices in underground and last pipe index
+      undergroundPipeIndices = [];
+      for (let i = 0; i < undergroundWorld.length; i++) {
+        if (undergroundWorld[i] === PIPE_CHAR) undergroundPipeIndices.push(i);
+      }
+      lastPipeUndergroundIndex = undergroundPipeIndices.length ? undergroundPipeIndices[undergroundPipeIndices.length - 1] : -1;
+      try { console.debug('[init] underground pipes', { count: undergroundPipeIndices.length, lastPipeUndergroundIndex }); } catch {}
+    }
+  } catch {}
   // Extract enemies from world into dynamic list and clear them from world tiles
   enemies = [];
   for (let i = 0; i < world.length; i++) {
@@ -381,6 +667,10 @@ function init() {
       setTileAt(i, GROUND_CHAR);
     }
   }
+  updateHighHUD();
+  updateScoreHUD();
+  updateInstructionsHUD();
+  setupShare();
   requestAnimationFrame(tick);
 }
 
@@ -398,6 +688,9 @@ function resetGame() {
   marqueeOffset = 0;
   timeLeft = 60;
   if (initialWorld) world = initialWorld;
+  isUnderground = false;
+  prevOverworldOffset = 0;
+  undergroundVisited = false;
   // Rebuild enemies from the reset world and clear them from tiles
   enemies = [];
   for (let i = 0; i < world.length; i++) {
@@ -412,4 +705,8 @@ function resetGame() {
   try { sfxDie.pause(); sfxDie.currentTime = 0; } catch {}
   try { sfxClear.pause(); sfxClear.currentTime = 0; } catch {}
   try { music.currentTime = 0; music.play(); } catch {}
+  updateHighHUD();
+  updateScoreHUD();
+  timedOut = false;
+  updateInstructionsHUD();
 }
