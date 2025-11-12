@@ -211,7 +211,7 @@ function updateInstructionsHUD() {
   } else if (!started) {
     el.textContent = isMobile ? 'Press UP to start' : 'Press UP arrow to start 👲🏻 Tiny Mario on your URL bar';
   } else {
-    el.textContent = 'Use arrow keys to move';
+    el.textContent = 'Use arrows to move. Collect coins, avoid enemies, and discover hidden underground areas.';
   }
 }
 function maybeUpdateBest() {
@@ -227,16 +227,19 @@ function setupShare() {
   btn.onclick = async () => {
     const text = `🍄👲🏻🏰 My high score is ${bestCoins} coins in Tiny Mario Bar! https://diego.horse/tiny-mario`;
     try {
-      if (navigator.share) {
+      
         await navigator.clipboard.writeText(`${text}`);
         const prev = btn.textContent;
         btn.textContent = 'Copied!';
         setTimeout(() => { btn.textContent = prev; }, 1200);
 
-        await navigator.share({  text, url });
-      
-      
+      if (navigator.share) {
+          await navigator.share({ text });
       }
+        
+      
+      
+      
     } catch {}
   };
 }

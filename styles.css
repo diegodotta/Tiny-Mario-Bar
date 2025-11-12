@@ -19,12 +19,11 @@
 .tiny-mario #url-display {
   display: block;
   flex: 1 1 auto;
-  border-bottom: 1px solid var(--border-color);
   white-space: pre;
   overflow-x: hidden;
   
 }
-.tiny-mario .url-zoom { display: inline-flex; gap: 6px; border-bottom: 1px solid var(--border-color); }
+.tiny-mario .url-zoom { display: inline-flex; gap: 6px; }
 .tiny-mario #instructions { flex: 1}
 .tiny-mario #instructions::before { content: 'ℹ️'; margin-right: 4px; }
 .tiny-mario .hud-emoji { width: 18px; display: inline-flex; justify-content: center; }
