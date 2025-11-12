@@ -1,7 +1,7 @@
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-const SCENE_LENGTH = isMobile ? 40 : 50;
+const SCENE_LENGTH = isMobile ? 40 : 60;
 const PLAYER_POS = 3;
 const GROUND_CHAR = '⠤';
 const HOLE_CHAR = '_';
