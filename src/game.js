@@ -49,7 +49,7 @@ let gameOver = false;
 let win = false;
 let coins = 0;
 let started = false; // game starts after first input
-let timeLeft = 60; // seconds remaining on the level timer
+let timeLeft = 99; // seconds remaining on the level timer
 let timedOut = false; // whether game over was caused by time running out
 
 const SPEED = 10;
