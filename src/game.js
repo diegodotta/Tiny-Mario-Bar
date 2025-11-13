@@ -264,6 +264,21 @@ function setupUrlControls() {
   plus.onclick = () => { size = Math.min(size + 1, 28); apply(); };
   minus.onclick = () => { size = Math.max(size - 1, 14); apply(); };
 }
+
+function setupTouchIsolation() {
+  if (!isMobile) return;
+  const hud = document.getElementById('hud');
+  if (!hud) return;
+  const stop = (e) => { e.stopPropagation(); };
+  try {
+    ['touchstart','touchmove','touchend'].forEach((t) => {
+      hud.addEventListener(t, stop, { capture: false, passive: true });
+    });
+    ['pointerdown','pointermove','pointerup','pointercancel'].forEach((t) => {
+      hud.addEventListener(t, stop, { capture: false, passive: true });
+    });
+  } catch {}
+}
 function onKeyDown(e) {
   keys.add(e.key);
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dir = -1;
@@ -803,6 +818,7 @@ function init() {
     }
   } catch {}
   setupUrlControls();
+  setupTouchIsolation();
   setupMobileControls();
   requestAnimationFrame(tick);
 }

@@ -21,6 +21,9 @@
   flex: 1 1 auto;
   white-space: pre;
   overflow-x: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   
 }
 .tiny-mario .url-zoom { display: inline-flex; gap: 6px; }
@@ -54,6 +57,11 @@
   margin: 2px;
   padding: 0;  border-radius: 5vmin;
   touch-action: manipulation;
+}
+
+/* Prevent scroll-gesture hit testing inside the HUD on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .tiny-mario { touch-action: none; }
 }
 
 .tiny-mario #up { grid-area: up; }
