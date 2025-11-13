@@ -175,7 +175,15 @@ function setupMobileControls() {
           } catch {}
           updateInstructionsHUD();
         }
-        if (gameOver || win) {
+        if (gameOver) {
+          // On mobile, add a short delay after game over to avoid accidental immediate reset
+          if (gameOverAt && (Date.now() - gameOverAt) < 1000) {
+            // ignore early presses
+            return;
+          }
+          resetGame();
+        } else if (win) {
+          // Allow immediate reset after win
           resetGame();
         } else {
           kd();
@@ -243,6 +251,7 @@ let dir = 0;
 let y = 0;
 let vy = 0;
 let gameOver = false;
+let gameOverAt = 0; // timestamp of last game over (ms since epoch)
 let win = false;
 let coins = 0;
 let started = false; // game starts after first input
@@ -862,6 +871,7 @@ function update(dt) {
   } else if (y === 0 && enemyIndex !== -1) {
     // Walking into an enemy on the ground kills the player
     gameOver = true;
+    gameOverAt = Date.now();
     dir = 0; vy = 0;
     try { music.pause(); } catch {}
     try { sfxDie.currentTime = 0; sfxDie.play().catch(() => {}); } catch {}
@@ -889,6 +899,7 @@ function update(dt) {
   // Immediate game over if landed in a hole
   if (y === 0 && currentTile === HOLE_CHAR) {
     gameOver = true;
+    gameOverAt = Date.now();
     dir = 0; vy = 0;
     try { music.pause(); } catch {}
     try { musicUnderground.pause(); } catch {}
@@ -911,6 +922,7 @@ function update(dt) {
       // Timeout -> game over
       timedOut = true;
       gameOver = true;
+      gameOverAt = Date.now();
       dir = 0; vy = 0;
       try { music.pause(); } catch {}
       try { musicUnderground.pause(); } catch {}
@@ -980,6 +992,7 @@ function resetGame() {
   y = 0;
   vy = 0;
   gameOver = false;
+  gameOverAt = 0;
   win = false;
   coins = 0;
   started = true; // immediately start after restart
