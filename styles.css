@@ -53,6 +53,7 @@
   border: 2px solid var(--border-color);
   margin: 2px;
   padding: 0;  border-radius: 5vmin;
+  touch-action: manipulation;
 }
 
 .tiny-mario #up { grid-area: up; }
