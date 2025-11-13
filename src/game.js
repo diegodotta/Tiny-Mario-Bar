@@ -466,7 +466,9 @@ function render() {
     // Mirror into in-page URL display at the same throttled cadence
     try {
       const ud = document.getElementById('url-display');
-      if (ud) ud.textContent = s;
+      if (ud) {
+        ud.textContent = coinStr + timeStr + '\n' + chars.join('') + status;
+      }
     } catch {}
   }
 }
