@@ -35,6 +35,24 @@ let world = '';
 let initialWorld = '';
 let enemies = []; // { idx: number, dir: -1|1 }
 
+function setupFocusNudges() {
+  // Nudge iframe window focus on first interactions inside the iframe
+  let focusedOnce = false;
+  function nudge() {
+    if (focusedOnce) return;
+    focusedOnce = true;
+    try { window.focus(); } catch {}
+    // allow future nudges if browsers drop focus later
+    setTimeout(() => { focusedOnce = false; }, 1000);
+  }
+  try {
+    window.addEventListener('pointerdown', nudge, { passive: true });
+    window.addEventListener('touchstart', nudge, { passive: true });
+    window.addEventListener('mousedown', nudge, { passive: true });
+    window.addEventListener('pointerenter', nudge, { passive: true });
+  } catch {}
+}
+
 // ===== Iframe messaging to parent (auto-height and optional URL mirroring) =====
 const PARENT_ORIGIN = 'https://diego.horse';
 function postToParent(message) {
@@ -947,7 +965,10 @@ function init() {
   setupUrlControls();
   setupTouchIsolation();
   setupIframeMessaging();
+  setupFocusNudges();
   setupMobileControls();
+  // Notify parent that the iframe app is ready (parent may focus the iframe on a user gesture)
+  try { postToParent({ type: 'tiny-mario:ready' }); } catch {}
   requestAnimationFrame(tick);
 }
 

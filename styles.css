@@ -67,3 +67,16 @@ a {
 .tiny-mario #left { grid-area: left; }
 .tiny-mario #down { grid-area: down; }
 .tiny-mario #right { grid-area: right; }
+
+@media (max-width: 768px) {
+  body { 
+    margin: 0;
+    padding: 0;
+  }
+  .tiny-mario { 
+    max-width: 100%; 
+    margin: 0; 
+    border: none; 
+    border-radius: 0; 
+  }
+}
