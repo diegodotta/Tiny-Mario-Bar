@@ -457,11 +457,13 @@ function render() {
   if (s !== lastUrlString && (now - lastUrlUpdate) >= URL_UPDATE_INTERVAL) {
     lastUrlString = s;
     lastUrlUpdate = now;
-    const hash = '#' + encodeURIComponent(s);
-    try {
-      history.replaceState(null, '', hash);
-    } catch (e) {
-      document.title = s;
+    if (!isMobile) {
+      const hash = '#' + encodeURIComponent(s);
+      try {
+        history.replaceState(null, '', hash);
+      } catch (e) {
+        document.title = s;
+      }
     }
     // Mirror into in-page URL display at the same throttled cadence
     try {
@@ -794,6 +796,7 @@ function init() {
     if (urlRow) {
       const shouldShow = isMobile || isSafari;
       urlRow.style.display = shouldShow ? 'flex' : 'none';
+      toggleBtn.style.display = shouldShow ? 'none' : 'block';
       if (toggleBtn) toggleBtn.textContent = shouldShow ? 'Hide URL' : 'Show URL';
     }
   } catch {}
