@@ -46,7 +46,7 @@ a {
 .tiny-mario .hud-credits { color: #666; border-top: 1px solid var(--border-color); }
 .tiny-mario .hud-credits:before { content: '👲🏻';  }
 .tiny-mario .controls {
-  display: grid;
+  display: none;
   grid-template-areas:
     ". up ."
     "left down right";
