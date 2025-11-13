@@ -71,9 +71,10 @@ OR
   - game.js — game loop, input, physics, renderer, HUD, mobile controls
   - levels.js — level strings (overworld and underground)
 
-## Roadmap
+## Future Improvements
+- Move the definition of underground enter and exit to levels.js
 - Additional levels
-- Migrate to the 8-dot Braille pattern instead of 6.
+- Migrate to the 8-dot Braille pattern instead of 6
 
 ## Contributing
 - Please open an issue or PR for changes
