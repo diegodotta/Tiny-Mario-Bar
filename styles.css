@@ -68,7 +68,7 @@ a {
 .tiny-mario #down { grid-area: down; }
 .tiny-mario #right { grid-area: right; }
 
-@media (max-width: 768px) {
+@media (hover: none) and (pointer: coarse) {
   body { 
     margin: 0;
     padding: 0;
