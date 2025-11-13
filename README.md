@@ -1,12 +1,20 @@
 # Tiny Mario
 
-A tiny side‑scroller, text-first platformer inspired by [URL Snake](https://demian.ferrei.ro/snake) and [Tiny Horse](https://github.com/your-repo/tiny-horse). The level is rendered as text (primarily Unicode Braille) to achieve a dense, crisp layout in a purely textual surface.
+This is my second small experiment inspired from URL Snake by Demian Ferreiro. The first one was Tiny Horse, which used only one type of movement (jump).
 
-- Inspiration: URL Snake and Tiny Horse
-- Reference Level: Super Mario Bros World 1-1
+Besides the challenge of creating a game in a 4 x 100 pixel scene with no color and limited characters, this time I wanted something more difficult. So, Tiny Mario reimagines the classic Super Mario Bros as a side-scroller with a low-fi, text-rendered style.
 
-## Overview
-Tiny Mario reimagines a classic side‑scroller as a low‑fi, text‑rendered experience. Reach the flag while avoiding pits and enemies. Rendering primarily uses Unicode Braille cells (e.g. ⠤ ⠥) for compact geometry.
+![Tiny Mario Gameplay](https://diego.horse/wp-content/uploads/2025/11/tinymario.gif)
+
+Your goal is to collect the most coins and reach the flag while avoiding pits and enemies before time runs out.
+
+Again, the rendering mainly uses Unicode Braille cells (e.g., ⠤ ⠥). But now, the player can move in all directions, even going down to an underworld through one of the “pipes.”
+
+![Underground View](https://diego.horse/wp-content/uploads/2025/11/tinymario-underground.gif)
+
+There’s just one level, though. If you want more, feel free to add them. This is an open-source project.
+
+Enjoy.
 
 ## Current Features
 - Text renderer using Unicode Braille
