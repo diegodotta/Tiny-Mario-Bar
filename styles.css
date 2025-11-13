@@ -24,6 +24,7 @@
   
 }
 .tiny-mario .url-zoom { display: inline-flex; gap: 6px; }
+.tiny-mario .url-zoom button { height: 2em;}
 .tiny-mario #instructions { flex: 1}
 .tiny-mario #instructions::before { content: 'ℹ️'; margin-right: 4px; }
 .tiny-mario .hud-emoji { width: 18px; display: inline-flex; justify-content: center; }
