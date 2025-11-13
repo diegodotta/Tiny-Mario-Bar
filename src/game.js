@@ -34,6 +34,22 @@ const COIN_ENEMY_CHAR = 'ȯ';
 let world = '';
 let initialWorld = '';
 let enemies = []; // { idx: number, dir: -1|1 }
+
+// Prime music playback on first gesture (mobile): start at zero volume to satisfy autoplay policies
+let musicPrimed = false;
+function primeMusic() {
+  if (musicPrimed) return;
+  musicPrimed = true;
+  try {
+    music.volume = 0;
+    music.play().then(() => {
+      // keep playing silently until we decide to raise volume on start
+    }).catch(() => {
+      musicPrimed = false; // allow retry if it failed
+      music.volume = 0.3;
+    });
+  } catch {}
+}
 let undergroundWorld = '';
 let undergroundRaw = '';
 let undergroundRawInitial = '';
@@ -89,6 +105,20 @@ function setupMobileControls() {
     if (id === 'up') {
       const handlePress = (e) => {
         e.preventDefault();
+        warmAudio(); // Warm audio on first touch
+        primeMusic(); // Unlock music playback on mobile
+        if (!started) {
+          started = true;
+          try {
+            if (musicPrimed) {
+              music.volume = 0.3;
+            } else {
+              music.currentTime = 0;
+              music.play().catch(() => {});
+            }
+          } catch {}
+          updateInstructionsHUD();
+        }
         if (gameOver || win) {
           resetGame();
         } else {
@@ -103,7 +133,24 @@ function setupMobileControls() {
       el.addEventListener('mouseup', handleRelease);
       el.addEventListener('mouseleave', handleRelease);
     } else {
-      el.addEventListener('touchstart', (e) => { e.preventDefault(); kd(); }, { passive: false });
+      el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        warmAudio();
+        primeMusic();
+        if (!started) {
+          started = true;
+          try {
+            if (musicPrimed) {
+              music.volume = 0.3;
+            } else {
+              music.currentTime = 0;
+              music.play().catch(() => {});
+            }
+          } catch {}
+          updateInstructionsHUD();
+        }
+        kd();
+      }, { passive: false });
       el.addEventListener('touchend', (e) => { e.preventDefault(); ku(); }, { passive: false });
       el.addEventListener('touchcancel', (e) => { e.preventDefault(); ku(); }, { passive: false });
       el.addEventListener('mousedown', (e) => { e.preventDefault(); kd(); });
@@ -161,28 +208,52 @@ const base = (typeof domain === 'string' && domain) ? domain : '.';
 let music = new Audio(base + '/sound/soundtrack.mp3');
 music.loop = true;
 music.volume = 0.3;
+music.preload = 'auto';
 let musicUnderground = new Audio(base + '/sound/underground.mp3');
 musicUnderground.loop = true;
 musicUnderground.volume = 0.3;
+musicUnderground.preload = 'auto';
 let sfxJump = new Audio(base + '/sound/jump.mp3');
 sfxJump.volume = 0.3;
+sfxJump.preload = 'auto';
 let sfxCoin = new Audio(base + '/sound/coin.mp3');
 sfxCoin.volume = 0.7;
+sfxCoin.preload = 'auto';
 let sfxPipe = new Audio(base + '/sound/pipe.wav');
 sfxPipe.volume = 0.7;
+sfxPipe.preload = 'auto';
 let sfxDie = new Audio(base + '/sound/death.mp3');
 sfxDie.volume = 0.5;
+sfxDie.preload = 'auto';
 let sfxClear = new Audio(base + '/sound/stage_clear.mp3');
 sfxClear.volume = 0.5;
+sfxClear.preload = 'auto';
 let sfxStomp = null; // optional separate stomp sound
 try {
   sfxStomp = new Audio(base + '/sound/stomp.mp3');
   sfxStomp.volume = 0.5;
+  sfxStomp.preload = 'auto';
 } catch {}
 
 let lastUrlString = '';
 let lastUrlUpdate = 0;
 const URL_UPDATE_INTERVAL = 1 / 12; // seconds
+
+// Audio warmup: force decode on first user gesture to prevent mobile freeze
+let audioWarmed = false;
+function warmAudio() {
+  if (audioWarmed) return;
+  audioWarmed = true;
+  // Warm only short SFX to avoid interfering with background music play()
+  const all = [sfxJump, sfxCoin, sfxPipe, sfxDie, sfxClear];
+  if (sfxStomp) all.push(sfxStomp);
+  for (const a of all) {
+    try {
+      // Hint the browser to buffer metadata/audio without initiating playback
+      a.load();
+    } catch {}
+  }
+}
 
 const keys = new Set();
 let jumpStartIndex = -1; // track where the player initiated the jump
@@ -280,12 +351,14 @@ function setupTouchIsolation() {
   } catch {}
 }
 function onKeyDown(e) {
+  warmAudio(); // Warm audio on first keydown
+  primeMusic();
   keys.add(e.key);
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dir = -1;
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 1;
   if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
     if (y === 0) {
-      try { sfxJump.currentTime = 0; sfxJump.play(); } catch {}
+      try { sfxJump.currentTime = 0; sfxJump.play().catch(() => {}); } catch {}
       vy = JUMP_VELOCITY;
       jumpStartIndex = Math.floor(offset) + Math.floor(playerPos);
     }
@@ -313,14 +386,20 @@ function onKeyDown(e) {
         t: 0,
         underStartOffset,
       };
-      try { sfxPipe.currentTime = 0; sfxPipe.play(); } catch {}
+      try { sfxPipe.currentTime = 0; sfxPipe.play().catch(() => {}); } catch {}
       try { music.pause(); } catch {}
     }
   }
   // First input starts the game loop updates
   if (!started && (e.key === ' ' || e.key.startsWith('Arrow') || e.key.toLowerCase() === 'a' || e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'w')) {
     started = true;
-    try { music.currentTime = 0; music.play(); } catch {}
+    try {
+      if (musicPrimed) {
+        music.volume = 0.3; // raise volume if already playing silently
+      } else {
+        music.currentTime = 0; music.play().catch(() => {});
+      }
+    } catch {}
     updateInstructionsHUD();
   }
   if (e.key === 'r' || e.key === 'R') {
@@ -499,6 +578,13 @@ function tick(t) {
   // Advance marquee continuously
   marqueeOffset += MARQUEE_SPEED * dt;
   if (marqueeOffset > 1e9) marqueeOffset = marqueeOffset % 1000; // prevent unbounded growth
+  // Ensure overworld music is audible after start on mobile (but not during pipe animations)
+  if (started && !gameOver && !win && !isUnderground && !(pipeAnim && pipeAnim.phase)) {
+    try {
+      if (musicPrimed && music.volume === 0) music.volume = 0.3;
+      if (music.paused) music.play().catch(() => {});
+    } catch {}
+  }
   // Only update physics after the game has started and while active
   if (started && !gameOver && !win && !(pipeAnim && pipeAnim.phase)) update(dt);
   // Advance pipe animation frames and handle world switch mid-sequence
@@ -522,7 +608,8 @@ function tick(t) {
               setTileAt(i, GROUND_CHAR);
             }
           }
-          try { musicUnderground.currentTime = 0; musicUnderground.play(); } catch {}
+          try { music.pause(); } catch {}
+          try { musicUnderground.currentTime = 0; musicUnderground.play().catch(() => {}); } catch {}
           undergroundVisited = true;
           updateInstructionsHUD();
           pipeAnim.phase = 'under';
@@ -554,7 +641,7 @@ function tick(t) {
             }
           }
           try { musicUnderground.pause(); } catch {}
-          try { music.currentTime = 0; music.play(); } catch {}
+          try { music.currentTime = 0; music.play().catch(() => {}); } catch {}
           updateInstructionsHUD();
           pipeAnim.phase = 'over';
           pipeAnim.idx = 0;
@@ -575,7 +662,7 @@ function tick(t) {
     const gained = before - after;
     if (gained > 0) {
       coins += gained;
-      try { sfxCoin.currentTime = 0; sfxCoin.play(); } catch {}
+      try { sfxCoin.currentTime = 0; sfxCoin.play().catch(() => {}); } catch {}
       maybeUpdateBest();
       updateScoreHUD();
     }
@@ -683,7 +770,7 @@ function update(dt) {
       }
     }
     if (lastInvIdx !== -1 && playerIndex === lastInvIdx) {
-      try { sfxPipe.currentTime = 0; sfxPipe.play(); } catch {}
+      try { sfxPipe.currentTime = 0; sfxPipe.play().catch(() => {}); } catch {}
       pipeAnim = { mode: 'exit', phase: 'under', idx: 0, t: 0 };
     }
   }
@@ -694,7 +781,7 @@ function update(dt) {
       dir = 0; vy = 0;
       try { music.pause(); } catch {}
       try { musicUnderground.pause(); } catch {}
-      try { sfxClear.currentTime = 0; sfxClear.play(); } catch {}
+      try { sfxClear.currentTime = 0; sfxClear.play().catch(() => {}); } catch {}
       updateInstructionsHUD();
       updateMobileUpLabel();
     }
@@ -710,7 +797,7 @@ function update(dt) {
     vy = JUMP_VELOCITY * 0.6; // bounce
     try {
       const s = sfxStomp || sfxCoin;
-      s.currentTime = 0; s.play();
+      s.currentTime = 0; s.play().catch(() => {});
     } catch {}
     maybeUpdateBest();
     updateScoreHUD();
@@ -719,7 +806,7 @@ function update(dt) {
     gameOver = true;
     dir = 0; vy = 0;
     try { music.pause(); } catch {}
-    try { sfxDie.currentTime = 0; sfxDie.play(); } catch {}
+    try { sfxDie.currentTime = 0; sfxDie.play().catch(() => {}); } catch {}
     updateMobileUpLabel();
     return;
   }
@@ -859,7 +946,7 @@ function resetGame() {
   try { sfxDie.pause(); sfxDie.currentTime = 0; } catch {}
   try { sfxClear.pause(); sfxClear.currentTime = 0; } catch {}
   try { musicUnderground.pause(); musicUnderground.currentTime = 0; } catch {}
-  try { music.currentTime = 0; music.play(); } catch {}
+  try { music.currentTime = 0; music.play().catch(() => {}); } catch {}
   updateHighHUD();
   updateScoreHUD();
   timedOut = false;
