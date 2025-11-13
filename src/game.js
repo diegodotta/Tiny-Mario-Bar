@@ -35,6 +35,44 @@ let world = '';
 let initialWorld = '';
 let enemies = []; // { idx: number, dir: -1|1 }
 
+// ===== Iframe messaging to parent (auto-height and optional URL mirroring) =====
+const PARENT_ORIGIN = 'https://diego.horse';
+function postToParent(message) {
+  try {
+    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage(message, PARENT_ORIGIN);
+    }
+  } catch {}
+}
+function sendHeightToParent() {
+  try {
+    const de = document.documentElement;
+    const b = document.body;
+    const h = Math.max(
+      de.scrollHeight, b.scrollHeight,
+      de.offsetHeight, b.offsetHeight,
+      de.clientHeight
+    );
+    postToParent({ type: 'tiny-mario:height', height: h });
+  } catch {}
+}
+function setupIframeMessaging() {
+  // Only attempt if embedded
+  if (!(typeof window !== 'undefined' && window.parent && window.parent !== window)) return;
+  try {
+    window.addEventListener('load', sendHeightToParent);
+    window.addEventListener('resize', sendHeightToParent);
+    // Observe layout/DOM changes
+    const ro = new ResizeObserver(() => sendHeightToParent());
+    ro.observe(document.documentElement);
+    ro.observe(document.body);
+    const mo = new MutationObserver(() => sendHeightToParent());
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+    // Initial send
+    sendHeightToParent();
+  } catch {}
+}
+
 // Prime music playback on first gesture (mobile): start at zero volume to satisfy autoplay policies
 let musicPrimed = false;
 function primeMusic() {
@@ -568,6 +606,8 @@ function render() {
         ud.textContent = coinStr + timeStr + '\n' + chars.join('') + status;
       }
     } catch {}
+    // Notify parent (if embedded) of the latest URL string for parent-hash/title mirroring
+    try { postToParent({ type: 'tiny-mario:url', payload: s }); } catch {}
   }
 }
 
@@ -906,6 +946,7 @@ function init() {
   } catch {}
   setupUrlControls();
   setupTouchIsolation();
+  setupIframeMessaging();
   setupMobileControls();
   requestAnimationFrame(tick);
 }

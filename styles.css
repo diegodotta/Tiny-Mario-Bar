@@ -3,6 +3,15 @@
   --background-color: rgba(150,150,150,0.1);
 }
 
+body {
+  background-color: #24282B;
+  color: white;
+}
+
+a { 
+  color: white;
+}
+
 .tiny-mario { 
   max-width: 800px; 
   margin: 12px auto; 
