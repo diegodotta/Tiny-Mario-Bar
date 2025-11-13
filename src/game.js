@@ -98,12 +98,14 @@ function setupMobileControls() {
       const handleRelease = (e) => { e.preventDefault(); if (!(gameOver || win)) ku(); };
       el.addEventListener('touchstart', handlePress, { passive: false });
       el.addEventListener('touchend', handleRelease, { passive: false });
+      el.addEventListener('touchcancel', handleRelease, { passive: false });
       el.addEventListener('mousedown', handlePress);
       el.addEventListener('mouseup', handleRelease);
       el.addEventListener('mouseleave', handleRelease);
     } else {
       el.addEventListener('touchstart', (e) => { e.preventDefault(); kd(); }, { passive: false });
       el.addEventListener('touchend', (e) => { e.preventDefault(); ku(); }, { passive: false });
+      el.addEventListener('touchcancel', (e) => { e.preventDefault(); ku(); }, { passive: false });
       el.addEventListener('mousedown', (e) => { e.preventDefault(); kd(); });
       el.addEventListener('mouseup', (e) => { e.preventDefault(); ku(); });
       el.addEventListener('mouseleave', (e) => { e.preventDefault(); ku(); });
