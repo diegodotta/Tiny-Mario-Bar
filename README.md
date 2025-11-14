@@ -84,9 +84,11 @@ OR
 Public Domain (CC0 1.0)
 You can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission. See https://creativecommons.org/publicdomain/zero/1.0/
 
-## References
-- Url Snake by Demian Ferreiro: https://demian.ferrei.ro/snake
-- Tiny Horse by Diego Dotta: https://github.com/diegodotta/horse-jump-url-bar
-- Super Mario Bros World 1-1: https://ahistoryofthemushroomkingdom.fandom.com/wiki/World_1-1
-- Unicode Braille patterns: https://en.wikipedia.org/wiki/Braille_Patterns
-- Sound Effects: https://www.beepbox.co/
+## References and Tool
+- Pair programmed with [Windsurf](https://windsurf.com/refer?referral_code=oy0hdqpvkz4b88ng)
+- Proofread by [Smart Keys for Mac](https://smartkeys.so/for-macos/)
+- [Url Snake](https://demian.ferrei.ro/snake)
+- [Tiny Horse](https://github.com/diegodotta/horse-jump-url-bar)
+- [Super Mario Bros World 1-1](https://ahistoryofthemushroomkingdom.fandom.com/wiki/World_1-1)
+- [Unicode Braille patterns](https://en.wikipedia.org/wiki/Braille_Patterns)
+- [Sound Effects](https://www.beepbox.co/)
